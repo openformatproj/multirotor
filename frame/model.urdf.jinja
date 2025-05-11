@@ -1,0 +1,22 @@
+<link name="{{ frame_link_name }}">
+    <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="{{ mass }}"/>
+        <inertia ixx="{{ inertia_matrix[0, 0] }}" ixy="0.0" ixz="0.0" iyy="{{ inertia_matrix[1, 1] }}" iyz="0.0" izz="{{ inertia_matrix[2, 2] }}"/>
+    </inertial>
+    <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <box size="{{ size }} {{ size }} {{ size }}"/>
+        </geometry>
+        <material name="white">
+            <color rgba="1 1 1 1"/>
+        </material>
+    </visual>
+    <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <box size="{{ size }} {{ size }} {{ size }}"/>
+        </geometry>
+    </collision>
+</link>

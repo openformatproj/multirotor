@@ -1,0 +1,18 @@
+{% for i in range(1, propellers + 1) %}
+<joint name="propeller_{{ i }}_joint" type="fixed">
+    <parent link="{{ frame_link_name }}"/>
+    <child link="propeller_{{ i }}"/>
+    <origin xyz="{{ xyz[i] }}" rpy="0 0 0"/>
+</joint>
+<link name="propeller_{{ i }}">
+    <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <cylinder length="0.02" radius="0.05"/>
+        </geometry>
+        <material name="black">
+            <color rgba="0 0 0 1"/>
+        </material>
+    </visual>
+</link>
+{% endfor %}

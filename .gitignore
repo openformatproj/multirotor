@@ -1,0 +1,4 @@
+**/__pycache__/
+/conf.py
+/run.py
+/controller/*.py
