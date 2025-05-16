@@ -13,7 +13,7 @@ This project demonstrates how to design an autonomous multirotor model and simul
 
 ## Advantages
 
-The advantages of this approach are well known:
+The advantages of the component-based approach are well known:
 
 1. **Modularity**: Simplifies system design by breaking it into smaller, reusable components.
 2. **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
