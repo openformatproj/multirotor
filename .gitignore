@@ -3,3 +3,4 @@
 /run.py
 /controller/*.py
 /*.code-workspace
+/.vscode
