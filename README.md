@@ -33,13 +33,15 @@ docker pull openformatproj/multirotor
 docker run -it openformatproj/multirotor
 ```
 
-Once launched, you can execute the `run.py` script:
+Once launched, you can execute the `run.py` script from the container:
 
 ```bash
-python run.py
+/workspaces/multirotor# python run.py
 ```
 
 This should produce the following result:
+
+Figure 1
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin, but this behavior can be easily changed from the script itself.
 
@@ -47,7 +49,9 @@ A simulation involving a flying multirotor is executed. By default, `run.py` con
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
-Figure 1 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
+Figure 2
+
+Figure 2 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
 
 Here's a snippet of how the environment is built at the code level (`description.py`):
 
