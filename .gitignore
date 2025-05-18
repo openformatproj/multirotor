@@ -1,6 +1,6 @@
 **/__pycache__/
 /conf.py
 /run.py
-/controller/*.py
+/controller/*
 /*.code-workspace
 /.vscode
