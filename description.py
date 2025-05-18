@@ -187,3 +187,6 @@ class Top(Part):
             self.connect(self.get_part('multirotor').get_port(f'thrust_{i}'), self.get_part('simulator').get_port(f'multirotor_thrust_{i}'))
             self.connect(self.get_part('multirotor').get_port(f'torque_{i}'), self.get_part('simulator').get_port(f'multirotor_torque_{i}'))
         self.add_hook('init', self.init_simulation_engine)
+
+if __name__ == '__main__':
+    top = Top('top')
