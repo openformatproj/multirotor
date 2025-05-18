@@ -41,7 +41,7 @@ Once launched, you can execute the `run.py` script from the container:
 
 This should produce the following result:
 
-Figure 1
+![Figure 1](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif)
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin, but this behavior can be easily changed from the script itself.
 
@@ -49,7 +49,7 @@ A simulation involving a flying multirotor is executed. By default, `run.py` con
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
-![Figure 2](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
+Figure 2
 
 Figure 2 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
 
