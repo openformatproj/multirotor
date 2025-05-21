@@ -28,20 +28,23 @@ The advantages of the component-based approach are well known:
 
 A Docker image providing the source code included in this repository and all needed dependencies is available on Docker Hub. It can be launched with the following commands:
 
-```bash
+```text
 docker pull openformatproj/multirotor
 docker run -it openformatproj/multirotor
 ```
 
 Once launched, you can execute the `run.py` script from the container:
 
-```bash
+```text
 /workspaces/multirotor# python run.py
 ```
 
 This should produce the following result:
 
-![Figure 1](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif)
+<div style="text-align: center;">
+<img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1" height="300" style="margin: 0 10px;" />
+<img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2" height="300" style="margin: 0 10px;" />
+</div>
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin, but this behavior can be easily changed from the script itself.
 
@@ -49,9 +52,9 @@ A simulation involving a flying multirotor is executed. By default, `run.py` con
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
-Figure 2
+Figure 3
 
-Figure 2 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
+Figure 3 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
 
 Here's a snippet of how the environment is built at the code level (`description.py`):
 
