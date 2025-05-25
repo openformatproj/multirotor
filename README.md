@@ -46,12 +46,12 @@ Once launched, you can execute the `run.py` script from the container:
 This should produce the following result:
 
 <div style="text-align: center;">
-  <figure style="display: inline-block; margin: 0 10px; text-align: center;">
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1: Multirotor simulation - Trajectory view" height="300" />
+  <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1: Multirotor simulation - Trajectory view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
     <figcaption style="text-align: center;">Figure 1: Multirotor simulation - Trajectory view</figcaption>
   </figure>
-  <figure style="display: inline-block; margin: 0 10px; text-align: center;">
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2: Multirotor simulation - Altitude view" height="300" />
+  <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2: Multirotor simulation - Altitude view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
     <figcaption style="text-align: center;">Figure 2: Multirotor simulation - Altitude view</figcaption>
   </figure>
 </div>
@@ -71,7 +71,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
 
 <div style="text-align: center;">
   <figure id="figure-3">
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" />
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
     <figcaption style="text-align: center;">Figure 3: Multirotor model structure</figcaption>
   </figure>
 </div>
