@@ -4,8 +4,9 @@
 - [Overview](#overview)
 - [Improvement Areas](#improvement-areas)
 - [Contributing](#contributing)
-- [Contributors](#contributors)
+  - [Contributor Acknowledgment](#contributor-acknowledgment)
 - [License](#license)
+- [Tags](#tags)
 
 # Introduction
 
@@ -18,18 +19,18 @@ The advantages of the component-based approach are well known:
 1. **Modularity**: Simplifies system design by breaking it into smaller, reusable components.
     a. **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
     b. **Functional Allocation**: Enables the allocation of configuration, functionalities, and behaviors to specific components.
-2. **Interfacing**: Highlights the separation between functionalities and interfaces.
-3. **Early Validation**: Enables real-time simulation, testing, and validation of the system's behavior before physical implementation.
-4. **Cost Efficiency**: Reduces development costs by identifying and addressing issues early in the design phase.
-5. **Scalability**: Facilitates the addition of new features or components as the system evolves.
-6. **Interdisciplinary Collaboration**: Promotes collaboration by providing a clear structure for integrating contributions from different domains.
-7. **Code Generation**: Automates the creation of boilerplate and target-specific code from high-level behavioral descriptions, reducing manual effort and ensuring consistency across components.
-8. **Simulation of Target-Specific Code**: Allows the import and simulation of code taken from real-world targets.
-9. **Project Management**: Streamlines configuration, documentation generation, and overall project organization, making it easier to manage complex systems.
+    c. **Interfacing**: Highlights the separation between functionalities and interfaces.
+2. **Early Validation**: Enables real-time simulation, testing, and validation of the system's behavior before physical implementation.
+3. **Cost Efficiency**: Reduces development costs by identifying and addressing issues early in the design phase.
+4. **Scalability**: Facilitates the addition of new features or components as the system evolves.
+5. **Interdisciplinary Collaboration**: Promotes collaboration by providing a clear structure for integrating contributions from different domains.
+6. **Code Generation**: Automates the creation of boilerplate and target-specific code from high-level behavioral descriptions, reducing manual effort and ensuring consistency across components.
+7. **Simulation of Target-Specific Code**: Allows the import and simulation of code taken from real-world targets.
+8. **Project Management**: Streamlines configuration, documentation generation, and overall project organization, making it easier to manage complex systems.
 
 # Quick Start
 
-A Docker image providing the source code included in this repository and all needed dependencies is available on Docker Hub. It can be launched, if for instance you uses Docker Desktop, with the following commands:
+A Docker image providing the source code included in this repository and all needed dependencies is available on Docker Hub. It can be launched, if, for instance, you use Docker Desktop, with the following commands:
 
 ```text
 systemctl --user start docker-desktop
@@ -140,7 +141,7 @@ class Multirotor(Part_Timed):
 
 class Rigid_Body_Simulator(Part_Timed):
     def behavior(self):
-        if self.get_port('time').is_updated(): # sensitivity list
+        if self.get_port('time').is_updated():
             self.t = self.get_port('time').get()
             position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
             self.get_port('multirotor_position').set(position)
@@ -148,7 +149,7 @@ class Rigid_Body_Simulator(Part_Timed):
             linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
             self.get_port('multirotor_linear_speed').set(linear_speed)
             self.get_port('multirotor_angular_speed').set(angular_speed)
-            if all((self.get_port(f'multirotor_thrust_{i}').is_updated() and self.get_port(f'multirotor_torque_{i}').is_updated()) for i in PROPELLERS_INDEXES): # sensitivity list
+            if all((self.get_port(f'multirotor_thrust_{i}').is_updated() and self.get_port(f'multirotor_torque_{i}').is_updated()) for i in PROPELLERS_INDEXES):
                 for i in PROPELLERS_INDEXES:
                     thrust = self.get_port(f'multirotor_thrust_{i}').get()
                     torque = self.get_port(f'multirotor_torque_{i}').get()
@@ -226,19 +227,21 @@ Contributions are welcome! If you'd like to contribute to this project, please f
 
 For major changes, please open an issue first to discuss what you would like to change.
 
-# Contributors
+## Contributor Acknowledgment
 
-We value and appreciate contributions to this project! To ensure proper credit is given, here are some guidelines for contributors:
+To ensure proper credit is given, here are some guidelines:
 
-1. **Acknowledgment in the README**: Major contributors will be acknowledged in the "Contributors" section of this README.
-2. **Commit History**: All contributions will be visible in the commit history of the repository.
-3. **Pull Request Description**: Please include your name or preferred alias in the pull request description if you'd like to be credited.
-4. **Issues and Discussions**: Active participants in issues and discussions may also be acknowledged for their input and support.
-
-Thank you for helping improve this project!
+- **Acknowledgment**: Major contributors may be acknowledged in this section or other relevant parts of the documentation.
+- **Commit History**: All contributions will be visible in the commit history of the repository.
+- **Pull Request Description**: Please include your name or preferred alias in the pull request description if you'd like to be credited.
+- **Issues and Discussions**: Active participants in issues and discussions may also be acknowledged for their input and support.
 
 # License
 
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). You are free to use, modify, and distribute this software, provided that you include proper attribution to the original author(s). Redistribution must retain the original copyright notice and this license.
+
+# Tags
+
+`python`, `simulation`, `multirotor`, `drone`, `robotics`, `component-based`, `autonomous-systems`, `control-systems`, `MBSE`, `model-based-systems-engineering`, `systems-engineering`
