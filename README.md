@@ -70,9 +70,10 @@ This behavior can be easily changed from the script itself.
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
 <div style="text-align: center;">
-  <figure id="figure-3">
+  <div id="figure-3">
     <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
-    <figcaption style="display: block; text-align: center;">Figure 3: Multirotor model structure</figcaption>
+    <p style="text-align: center;">Figure 3: Multirotor model structure</p>
+  </figure>
   </figure>
 </div>
 
