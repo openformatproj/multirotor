@@ -46,14 +46,14 @@ Once launched, you can execute the `run.py` script from the container:
 This should produce the following result:
 
 <div style="text-align: center;">
-  <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
+  <div style="display: inline-block; margin: 0 10px; vertical-align: top;">
     <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1: Multirotor simulation - Trajectory view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
-    <figcaption style="text-align: center;">Figure 1: Multirotor simulation - Trajectory view</figcaption>
-  </figure>
-  <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
+    <p style="text-align: center;">Figure 1: Multirotor simulation - Trajectory view</p>
+  </div>
+  <div style="display: inline-block; margin: 0 10px; vertical-align: top;">
     <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2: Multirotor simulation - Altitude view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
-    <figcaption style="text-align: center;">Figure 2: Multirotor simulation - Altitude view</figcaption>
-  </figure>
+    <p style="text-align: center;">Figure 2: Multirotor simulation - Altitude view</p>
+  </div>
 </div>
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
