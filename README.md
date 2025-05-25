@@ -16,21 +16,25 @@ This project demonstrates how to design an autonomous multirotor model and simul
 The advantages of the component-based approach are well known:
 
 1. **Modularity**: Simplifies system design by breaking it into smaller, reusable components.
-2. **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
+    a. **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
+    b. **Functional Allocation**: Enables the allocation of configuration, functionalities, and behaviors to specific components.
+2. **Interfacing**: Highlights the separation between functionalities and interfaces.
 3. **Early Validation**: Enables real-time simulation, testing, and validation of the system's behavior before physical implementation.
 4. **Cost Efficiency**: Reduces development costs by identifying and addressing issues early in the design phase.
 5. **Scalability**: Facilitates the addition of new features or components as the system evolves.
 6. **Interdisciplinary Collaboration**: Promotes collaboration by providing a clear structure for integrating contributions from different domains.
-7. **Code Generation**: Automates the creation of boilerplate code from high-level behavioral descriptions, reducing manual effort and ensuring consistency across components.
-8. **Project Management**: Streamlines configuration, documentation generation, and overall project organization, making it easier to manage complex systems.
+7. **Code Generation**: Automates the creation of boilerplate and target-specific code from high-level behavioral descriptions, reducing manual effort and ensuring consistency across components.
+8. **Simulation of Target-Specific Code**: Allows the import and simulation of code taken from real-world targets.
+9. **Project Management**: Streamlines configuration, documentation generation, and overall project organization, making it easier to manage complex systems.
 
 # Quick Start
 
-A Docker image providing the source code included in this repository and all needed dependencies is available on Docker Hub. It can be launched with the following commands:
+A Docker image providing the source code included in this repository and all needed dependencies is available on Docker Hub. It can be launched, if for instance you uses Docker Desktop, with the following commands:
 
 ```text
-docker pull openformatproj/multirotor
-docker run -it openformatproj/multirotor
+systemctl --user start docker-desktop
+docker pull openformatproj/multirotor:latest
+docker run -it openformatproj/multirotor:latest
 ```
 
 Once launched, you can execute the `run.py` script from the container:
@@ -42,19 +46,37 @@ Once launched, you can execute the `run.py` script from the container:
 This should produce the following result:
 
 <div style="text-align: center;">
-<img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1" height="300" style="margin: 0 10px;" />
-<img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2" height="300" style="margin: 0 10px;" />
+  <figure style="display: inline-block; margin: 0 10px; text-align: center;">
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1: Multirotor simulation - Trajectory view" height="300" />
+    <figcaption>Figure 1: Multirotor simulation - Trajectory view</figcaption>
+  </figure>
+  <figure style="display: inline-block; margin: 0 10px; text-align: center;">
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2: Multirotor simulation - Altitude view" height="300" />
+    <figcaption>Figure 2: Multirotor simulation - Altitude view</figcaption>
+  </figure>
 </div>
 
-A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin, but this behavior can be easily changed from the script itself.
+A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
+
+```python
+SET_POSITION = lambda t : [cos(w*t), sin(w*t), 1 + a*sin(q*t)]
+SET_SPEED = lambda t : [w * (-sin(w*t)), w * cos(w*t), a * q * cos(q*t)]
+```
+
+This behavior can be easily changed from the script itself.
 
 # Overview
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
-Figure 3
+<div style="text-align: center;">
+  <figure id="figure-3">
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" />
+    <figcaption>Figure 3: Multirotor model structure</figcaption>
+  </figure>
+</div>
 
-Figure 3 shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
+<a href="#figure-3">Figure 3</a> shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
 
 Here's a snippet of how the environment is built at the code level (`description.py`):
 
@@ -101,10 +123,10 @@ class Multirotor(Part_Timed):
         self.connect(self.get_part('sensors').get_port('roll_speed'), self.get_part('controller').get_port('roll_speed'))
         self.connect(self.get_part('sensors').get_port('pitch_speed'), self.get_part('controller').get_port('pitch_speed'))
         self.connect(self.get_part('sensors').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed'))
-        for i in [X, Y, Z]:
-            self.connect(self.get_part('sensors').get_port(i.name()), self.get_part('trajectory_planner').get_port(i.name()))
-            self.connect(self.get_part('trajectory_planner').get_port(f'{i.name()}_speed'), self.get_part('controller').get_port(f'{i.name()}_speed_setpoint'))
-            self.connect(self.get_part('sensors').get_port(f'{i.name()}_speed'), self.get_part('controller').get_port(f'{i.name()}_speed'))
+        for i in ['x', 'y', 'z']:
+            self.connect(self.get_part('sensors').get_port(i), self.get_part('trajectory_planner').get_port(i))
+            self.connect(self.get_part('trajectory_planner').get_port(f'{i}_speed'), self.get_part('controller').get_port(f'{i}_speed_setpoint'))
+            self.connect(self.get_part('sensors').get_port(f'{i}_speed'), self.get_part('controller').get_port(f'{i}_speed'))
         self.connect(self.get_part('trajectory_planner').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed_setpoint'))
         for i in PROPELLERS_INDEXES:
             self.connect(self.get_part('controller').get_port(f'angular_speed_{i}'), self.get_part(f'motor_{i}').get_port('angular_speed_in'))
@@ -173,16 +195,25 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 
 `class Top` finally aggregates the simulator, the multirotor model and a timer whose role is updating the time with a specific periodicity. This allows to run a "real time" simulation, provided that all computations are able to terminate within that period. To perform the simulation one can simply instantiate that class and run the timer:
 
+```python
+top = Top('top')
+
+top.init()
+top.get_part('timer').run(t_end = None)
+top.term()
+```
+
 This is exactly what the script `run.py` available in the Docker image does.
 
 # Improvement Areas
 
 While the project demonstrates a functional simulation of a multirotor, there are several areas for potential improvement:
 
-1. **Better Modeling of Sensors**: Enhance the accuracy and realism of sensor models (radio-altimeters, GNSS, INS, proximity sensors and so on) and introduce sensor-fusion techniques.
+1. **Better Modeling of Sensors**: Enhance the accuracy and realism of sensor models (radio-altimeters, GNSS, INS, LIDARs, proximity sensors and so on).
 2. **Better Modeling of Actuators (Motors and Propellers)**: Enhance the precision and reliability of actuator models.
 3. **Creation of a More Detailed Simulation Environment**: Develop a richer and more complex simulation environment to test the multirotor in diverse scenarios.
 4. **Development of Trajectory Planning Based on Local Features**: Implement trajectory planning that relies on local features rather than global world coordinates, enabling more adaptive and context-aware navigation.
+5. **Experiment Advanced Features**: Explore capabilities like reinforcement learning for adaptive control policies, machine vision for enhanced environmental awareness, and advanced sensor fusion techniques for robust state estimation.
 
 # Contributing
 
