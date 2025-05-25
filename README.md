@@ -72,7 +72,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
 <div style="text-align: center;">
   <figure id="figure-3">
     <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
-    <figcaption style="text-align: center;">Figure 3: Multirotor model structure</figcaption>
+    <figcaption style="display: block; text-align: center;">Figure 3: Multirotor model structure</figcaption>
   </figure>
 </div>
 
