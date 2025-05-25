@@ -73,8 +73,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
   <div id="figure-3">
     <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
     <p style="text-align: center;">Figure 3: Multirotor model structure</p>
-  </figure>
-  </figure>
+  </div>
 </div>
 
 <a href="#figure-3">Figure 3</a> shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
