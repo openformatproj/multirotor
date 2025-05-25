@@ -2,11 +2,11 @@
   - [Advantages](#advantages)
 - [Quick Start](#quick-start)
 - [Overview](#overview)
+- [Tags](#tags)
 - [Improvement Areas](#improvement-areas)
 - [Contributing](#contributing)
   - [Contributor Acknowledgment](#contributor-acknowledgment)
 - [License](#license)
-- [Tags](#tags)
 
 # Introduction
 
@@ -207,6 +207,10 @@ top.term()
 
 This is exactly what the script `run.py` available in the Docker image does.
 
+# Tags
+
+`python`, `simulation`, `multirotor`, `drone`, `robotics`, `component-based`, `autonomous-systems`, `control-systems`, `MBSE`, `model-based-systems-engineering`, `systems-engineering`
+
 # Improvement Areas
 
 While the project demonstrates a functional simulation of a multirotor, there are several areas for potential improvement:
@@ -241,7 +245,3 @@ To ensure proper credit is given, here are some guidelines:
 ![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). You are free to use, modify, and distribute this software, provided that you include proper attribution to the original author(s). Redistribution must retain the original copyright notice and this license.
-
-# Tags
-
-`python`, `simulation`, `multirotor`, `drone`, `robotics`, `component-based`, `autonomous-systems`, `control-systems`, `MBSE`, `model-based-systems-engineering`, `systems-engineering`
