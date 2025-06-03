@@ -10,7 +10,7 @@
 
 # Introduction
 
-This project demonstrates how to design an autonomous multirotor model and simulate it using a component-based environment built with Python (hence, purely text-based, at least for now).
+This project demonstrates how to design an autonomous multirotor model and simulate it using a component-based environment built with Python (hence, purely text-based).
 
 ## Advantages
 
@@ -44,13 +44,13 @@ Once launched, you can execute the `run.py` script from the container:
 /workspaces/multirotor# python run.py
 ```
 
-This should produce the following result:
+This script builds the multirotor architecture, initializes it and starts the simulation timer. The execution should produce the following result:
 
 ![Figure 1: Multirotor simulation - 3D rendering](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif)
-<p align="center">Figure 1: Multirotor simulation - 3D rendering</p>
+<p align="center">Figure 1: Multirotor simulation - 3D rendering (PyBullet)</p>
 
 ![Figure 2: Multirotor simulation - Position plot](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
-<p align="center">Figure 2: Multirotor simulation - Position plot</p>
+<p align="center">Figure 2: Multirotor simulation - Position plot (matplotlib)</p>
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
 
