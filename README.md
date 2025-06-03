@@ -46,16 +46,11 @@ Once launched, you can execute the `run.py` script from the container:
 
 This should produce the following result:
 
-<div style="display: flex; justify-content: center; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
-  <div> <!-- Figure 1 container -->
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif" alt="Figure 1: Multirotor simulation - Trajectory view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
-    <p style="text-align: center;">Figure 1: Multirotor simulation - Trajectory view</p>
-  </div>
-  <div> <!-- Figure 2 container -->
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif" alt="Figure 2: Multirotor simulation - Altitude view" height="300" style="display: block; margin-left: auto; margin-right: auto;" />
-    <p style="text-align: center;">Figure 2: Multirotor simulation - Altitude view</p>
-  </div>
-</div>
+![Figure 1: Multirotor simulation - 3D rendering](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif)
+<p align="center">Figure 1: Multirotor simulation - 3D rendering</p>
+
+![Figure 2: Multirotor simulation - Position plot](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
+<p align="center">Figure 2: Multirotor simulation - Position plot</p>
 
 A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
 
@@ -70,13 +65,10 @@ This behavior can be easily changed from the script itself.
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
 
-<div style="text-align: center;">
-<div style="display: flex; justify-content: center;">
-  <div id="figure-3">
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
-    <p style="text-align: center;">Figure 3: Multirotor model structure</p>
-  </div>
-</div>
+<p id="figure-3"/>
+
+![Figure 3: Multirotor model structure](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg)
+<p align="center">Figure 3: Multirotor model structure</p>
 
 <a href="#figure-3">Figure 3</a> shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
 
