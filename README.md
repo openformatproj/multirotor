@@ -52,7 +52,7 @@ This script builds the multirotor architecture, initializes it and starts the si
 ![Figure 2: Multirotor simulation - Position plot](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
 <p align="center">Figure 2: Multirotor simulation - Position plot (matplotlib)</p>
 
-A simulation involving a flying multirotor is executed. By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
+By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
 
 ```python
 SET_POSITION = lambda t : [cos(w*t), sin(w*t), 1 + a*sin(q*t)]
