@@ -5,6 +5,8 @@
 - [Tags](#tags)
 - [Improvement Areas](#improvement-areas)
 - [Contributing](#contributing)
+  - [Ways to Contribute](#ways-to-contribute)
+  - [Contribution Workflow](#contribution-workflow)
   - [Contributor Acknowledgment](#contributor-acknowledgment)
 - [License](#license)
 
@@ -210,18 +212,50 @@ While the project demonstrates a functional simulation of a multirotor, there ar
 1. **Better Modeling of Sensors**: Enhance the accuracy and realism of sensor models (radio-altimeters, GNSS, INS, LIDARs, proximity sensors and so on).
 2. **Better Modeling of Actuators (Motors and Propellers)**: Enhance the precision and reliability of actuator models.
 3. **Creation of a More Detailed Simulation Environment**: Develop a richer and more complex simulation environment to test the multirotor in diverse scenarios.
-4. **Development of Trajectory Planning Based on Local Features**: Implement trajectory planning that relies on local features rather than global world coordinates, enabling more adaptive and context-aware navigation.
-5. **Experiment Advanced Features**: Explore capabilities like reinforcement learning for adaptive control policies, machine vision for enhanced environmental awareness, and advanced sensor fusion techniques for robust state estimation.
+4. **Advanced Autonomy and AI Integration**: Explore advanced capabilities for autonomous navigation and decision-making. This includes:
+    *   **Adaptive Trajectory Planning**: Implement trajectory planning based on local features and real-time sensor data (e.g., using LIDAR or cameras) for dynamic obstacle avoidance and navigation in complex environments.
+        *   *Technologies*: Consider leveraging libraries like `OpenCV` for visual feature extraction, `PyLIDAR` (or similar) for LIDAR data processing, and path planning algorithms (e.g., A*, RRT*, D*) potentially integrated with robotics frameworks like `ROS` (Robot Operating System) with its Python bindings (`rospy`, `rclpy`).
+    *   **Reinforcement Learning**: Develop and apply reinforcement learning techniques for learning optimal control policies, adaptive flight maneuvers, or complex mission execution.
+        *   *Technologies*: Explore frameworks such as `TensorFlow (TF-Agents)`, `PyTorch (TorchRL)`, `Stable Baselines3`, or `Ray (RLlib)`.
+    *   **Machine Vision & Perception**: Integrate advanced machine vision for tasks like object detection/classification (e.g., using YOLO, SSD, Faster R-CNN models), semantic segmentation, 3D reconstruction, visual odometry, and SLAM (Simultaneous Localization and Mapping).
+        *   *Technologies*: Utilize `OpenCV`, `PyTorch`/`TensorFlow` for deep learning models, `Open3D` for 3D data processing, and libraries supporting various SLAM algorithms.
+    *   **Advanced Sensor Fusion**: Implement sophisticated sensor fusion algorithms (e.g., Extended Kalman Filters (EKF), Unscented Kalman Filters (UKF), Particle Filters, Factor Graphs) to combine data from heterogeneous sensors (IMU, GNSS, cameras, LIDAR, radar) for robust and accurate state estimation, especially in challenging (e.g., GNSS-denied) environments.
+        *   *Technologies*: Libraries like `FilterPy`, `NumPy`/`SciPy` for numerical backends, and potentially custom implementations or integrations with `ROS` message filters.
+    *   **AI-Driven Mission Planning and Execution**: Develop higher-level cognitive functions for autonomous mission planning, dynamic replanning, task allocation, and complex decision-making under uncertainty.
+        *   *Technologies*: Investigate AI planning techniques like PDDL (Planning Domain Definition Language) with Python parsers/solvers, Hierarchical Task Networks (HTNs) using libraries like `Pyhop`, or Behavior Trees (e.g., `py_trees`).
+    *   **Swarm Intelligence and Multi-Agent Systems**: Extend the framework to simulate and coordinate multiple multirotors for collaborative tasks, exploring decentralized control strategies, formation flying, and distributed task allocation.
+        *   *Technologies*: This could involve custom multi-agent simulation logic, or leveraging communication middleware like `ZeroMQ`, `MQTT`, or `ROS 2` for inter-agent communication.
 
 # Contributing
 
-Contributions are welcome! If you'd like to contribute to this project, please follow these steps:
+We warmly welcome contributions to enhance this multirotor simulation project! Whether you're fixing a bug, adding a new feature, improving documentation, or suggesting new ideas, your input is valuable.
 
-1. Create a new branch for your feature or bug fix within this repository.
-2. Commit your changes and push them to your branch.
-3. Submit a pull request with a detailed description of your changes.
+## Ways to Contribute
 
-For major changes, please open an issue first to discuss what you would like to change.
+*   **Bug Reports**: If you find a bug, please open an issue detailing the problem, steps to reproduce, and your environment.
+*   **Feature Requests**: Have an idea for a new feature or an improvement to an existing one? Open an issue to discuss it.
+*   **Code Contributions**: Implement new features, fix bugs, or refactor code. See the [Improvement Areas](#improvement-areas) for inspiration.
+*   **Documentation**: Improve code comments or add other explanatory documents.
+*   **Testing**: Add or improve unit tests, integration tests, or simulation scenarios.
+
+## Contribution Workflow
+
+If you'd like to contribute code or documentation, please follow these general steps:
+
+1.  **Discuss (for major changes)**: For significant changes (e.g., new core features, large refactors), please open an issue first to discuss your ideas. This helps ensure your efforts align with the project's direction and avoids duplicate work.
+2.  **Fork the Repository**: Create your own fork of the project on GitHub.
+3.  **Create a Branch**: Create a new branch in your fork for your feature or bug fix.
+    ```bash
+    git checkout -b your-descriptive-branch-name
+    ```
+4.  **Make Your Changes**: Implement your changes, adhering to any existing code style if possible.
+5.  **Test Your Changes**: Ensure your changes work as expected and do not introduce new issues.
+6.  **Commit Your Changes**: Write clear, concise commit messages.
+7.  **Push to Your Fork**: Push your changes to your branch on your fork.
+    ```bash
+    git push origin your-descriptive-branch-name
+    ```
+8.  **Submit a Pull Request (PR)**: Open a pull request from your branch to the `master` (or main development) branch of the original repository. Provide a clear title and a detailed description of your changes, referencing any relevant issues.
 
 ## Contributor Acknowledgment
 
@@ -230,7 +264,7 @@ To ensure proper credit is given, here are some guidelines:
 - **Acknowledgment**: Major contributors may be acknowledged in this section or other relevant parts of the documentation.
 - **Commit History**: All contributions will be visible in the commit history of the repository.
 - **Pull Request Description**: Please include your name or preferred alias in the pull request description if you'd like to be credited.
-- **Issues and Discussions**: Active participants in issues and discussions may also be acknowledged for their input and support.
+- **Issues and Discussions**: Active participation in issue discussions, providing feedback, and helping others are also valuable forms of contribution and may be acknowledged.
 
 # License
 
