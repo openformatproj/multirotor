@@ -19,9 +19,9 @@ This project demonstrates how to design an autonomous multirotor model and simul
 The advantages of the component-based approach are well known:
 
 1. **Modularity**: Simplifies system design by breaking it into smaller, reusable components.
-    a. **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
-    b. **Functional Allocation**: Enables the allocation of configuration, functionalities, and behaviors to specific components.
-    c. **Interfacing**: Highlights the separation between functionalities and interfaces.
+    *   **Flexibility**: Allows easy modification or replacement of individual components without affecting the entire system.
+    *   **Functional Allocation**: Enables the allocation of configuration, functionalities, and behaviors to specific components.
+    *   **Interfacing**: Highlights the separation between functionalities and interfaces.
 2. **Early Validation**: Enables real-time simulation, testing, and validation of the system's behavior before physical implementation.
 3. **Cost Efficiency**: Reduces development costs by identifying and addressing issues early in the design phase.
 4. **Scalability**: Facilitates the addition of new features or components as the system evolves.
