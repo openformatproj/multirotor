@@ -217,6 +217,8 @@ top.term()
 
 This is exactly what the script `run.py` available in the Docker image does.
 
+For more information about the ml engine, read the [documentation](https://openformatproj.github.io/ml-docs/).
+
 # Tags
 
 `python`, `simulation`, `multirotor`, `drone`, `robotics`, `component-based`, `autonomous-systems`, `control-systems`, `MBSE`, `model-based-systems-engineering`, `systems-engineering`
