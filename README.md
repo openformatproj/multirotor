@@ -73,121 +73,120 @@ The idea in this case is to define the behavior of bottom-level components (moto
 <div style="text-align: center;">
 <div style="display: flex; justify-content: center;">
   <div id="figure-3">
-    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.svg" alt="Figure 3: Diagram of the multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
+    <img src="https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.png" alt="Figure 3: Multirotor model structure" style="display: block; margin-left: auto; margin-right: auto;" />
     <p style="text-align: center;">Figure 3: Multirotor model structure</p>
   </div>
 </div>
 
-<a href="#figure-3">Figure 3</a> shows how the model has been built. Along with the components cited above, it is possible to see the simulator engine and a structure used to step the simulation, which is basically composed of a timer connected to all elements that must step.
+<a href="#figure-3">Figure 3</a> shows the high-level structure of the `Multirotor` model (the diagram has been generated with [openformatproj/diagrams](https://github.com/openformatproj/diagrams)). The `Top` component encapsulates the `Multirotor` model and the `Rigid_Body_Simulator`. The entire simulation is driven by an external `Timer` (an `EventSource`), which provides time-tick events to the `Top` part. This event-driven approach ensures that the simulation only executes when a time step is required.
 
 Here's a snippet of how the environment is built at the code level (`description.py`):
 
 ```python
-from ml.engine import Part
-from ml.engine import Port
-from ml.parts import Broadcaster, Part_Timed, Timer
+from ml.engine import Part, Port, EventQueue, sequential_execution
+from ml.parts import EventToDataSynchronizer
+from ml.event_sources import Timer
 import conf
 from propeller.description import Propeller
 from motor.description import Motor
 from sensors.description import Sensors
 from trajectory_planner.behavior import Trajectory_Planner
 from controller.description import Controller
+from constants import X, Y, Z
 
 PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
 
-class Multirotor(Part_Timed):
-    def __init__(self, identifier):
+class Multirotor(Part):
+    def __init__(self, identifier: str):
         ports = [
+            Port('time', Port.IN),
             Port('position', Port.IN),
             Port('orientation', Port.IN),
             Port('linear_speed', Port.IN),
             Port('angular_speed', Port.IN)
         ]
         parts = {
-            Sensors('sensors', conf.PLOT),
-            Trajectory_Planner('trajectory_planner', conf.SET_POSITION, conf.SET_SPEED),
-            Controller('controller', PROPELLERS_INDEXES)
+            'sensors': Sensors('sensors', conf.PLOT),
+            'trajectory_planner': Trajectory_Planner('trajectory_planner', conf.SET_POSITION, conf.SET_SPEED),
+            'controller': Controller('controller', PROPELLERS_INDEXES)
         }
         for i in PROPELLERS_INDEXES:
             ports.append(Port(f'thrust_{i}', Port.OUT))
             ports.append(Port(f'torque_{i}', Port.OUT))
-            parts.add(Motor(f'motor_{i}'))
+            parts[f'motor_{i}'] = Motor(f'motor_{i}')
             direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
-            parts.add(Propeller(f'propeller_{i}', direction))
-        super().__init__(identifier, Part.SEQUENTIAL_ALLOCATION, ports=ports, parts=parts)
-        self.connect(self.get_port('position'), self.get_part('sensors').get_port('position'))
-        self.connect(self.get_port('orientation'), self.get_part('sensors').get_port('orientation'))
-        self.connect(self.get_port('linear_speed'), self.get_part('sensors').get_port('linear_speed'))
-        self.connect(self.get_port('angular_speed'), self.get_part('sensors').get_port('angular_speed'))
-        self.connect(self.get_part('sensors').get_port('roll'), self.get_part('controller').get_port('roll'))
-        self.connect(self.get_part('sensors').get_port('pitch'), self.get_part('controller').get_port('pitch'))
-        self.connect(self.get_part('sensors').get_port('yaw'), self.get_part('trajectory_planner').get_port('yaw'))
-        self.connect(self.get_part('sensors').get_port('roll_speed'), self.get_part('controller').get_port('roll_speed'))
-        self.connect(self.get_part('sensors').get_port('pitch_speed'), self.get_part('controller').get_port('pitch_speed'))
-        self.connect(self.get_part('sensors').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed'))
-        for i in ['x', 'y', 'z']:
-            self.connect(self.get_part('sensors').get_port(i), self.get_part('trajectory_planner').get_port(i))
-            self.connect(self.get_part('trajectory_planner').get_port(f'{i}_speed'), self.get_part('controller').get_port(f'{i}_speed_setpoint'))
-            self.connect(self.get_part('sensors').get_port(f'{i}_speed'), self.get_part('controller').get_port(f'{i}_speed'))
-        self.connect(self.get_part('trajectory_planner').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed_setpoint'))
-        for i in PROPELLERS_INDEXES:
-            self.connect(self.get_part('controller').get_port(f'angular_speed_{i}'), self.get_part(f'motor_{i}').get_port('angular_speed_in'))
-            self.connect(self.get_part(f'motor_{i}').get_port('angular_speed_out'), self.get_part(f'propeller_{i}').get_port('angular_speed'))
-            self.connect(self.get_part(f'propeller_{i}').get_port(f'thrust'), self.get_port(f'thrust_{i}'))
-            self.connect(self.get_part(f'motor_{i}').get_port(f'reaction_torque'), self.get_port(f'torque_{i}'))
-        if conf.PLOT:
-            self.add_hook('init', self.init_plots)
-            self.add_hook('term', self.term_plots)
+            parts[f'propeller_{i}'] = Propeller(f'propeller_{i}', direction)
+            
+        super().__init__(
+            identifier=identifier,
+            execution_strategy=sequential_execution,
+            ports=ports,
+            parts=parts
+        )
+        
+        # Connect time, position, orientation, etc. to inner parts
+        # ... (connection logic as in description.py) ...
 
-class Rigid_Body_Simulator(Part_Timed):
+class Rigid_Body_Simulator(Part):
     def behavior(self):
-        if self.get_port('time').is_updated():
-            self.t = self.get_port('time').get()
+        time_port = self.get_port('time')
+        if time_port.is_updated():
+            # Consume the time input to allow the simulation to advance
+            time_port.get()
+
             position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
             self.get_port('multirotor_position').set(position)
-            self.get_port('multirotor_orientation').set(orientation)
-            linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
-            self.get_port('multirotor_linear_speed').set(linear_speed)
-            self.get_port('multirotor_angular_speed').set(angular_speed)
-            if all((self.get_port(f'multirotor_thrust_{i}').is_updated() and self.get_port(f'multirotor_torque_{i}').is_updated()) for i in PROPELLERS_INDEXES):
+            # ... (set other sensor outputs) ...
+
+            # Check if all motor inputs are ready before applying forces
+            thrust_ports = [self.get_port(f'multirotor_thrust_{i}') for i in PROPELLERS_INDEXES]
+            torque_ports = [self.get_port(f'multirotor_torque_{i}') for i in PROPELLERS_INDEXES]
+            if all(p.is_updated() for p in thrust_ports) and all(p.is_updated() for p in torque_ports):
                 for i in PROPELLERS_INDEXES:
-                    thrust = self.get_port(f'multirotor_thrust_{i}').get()
-                    torque = self.get_port(f'multirotor_torque_{i}').get()
+                    thrust = thrust_ports[i-1].get()
+                    torque = torque_ports[i-1].get()
                     self.engine.applyExternalForce(self.multirotor_avatar, i-1, thrust, [0, 0, 0], self.engine.LINK_FRAME)
                     self.engine.applyExternalTorque(self.multirotor_avatar, i-1, torque, self.engine.LINK_FRAME)
                 self.engine.stepSimulation()
-    def __init__(self, identifier):
+
+    def __init__(self, identifier: str):
         ports = [
+            Port('time', Port.IN),
             Port('multirotor_position', Port.OUT),
-            Port('multirotor_orientation', Port.OUT),
-            Port('multirotor_linear_speed', Port.OUT),
-            Port('multirotor_angular_speed', Port.OUT)
+            # ... (other ports) ...
         ]
         for i in PROPELLERS_INDEXES:
             ports.append(Port(f'multirotor_thrust_{i}', Port.IN))
             ports.append(Port(f'multirotor_torque_{i}', Port.IN))
-        super().__init__(identifier, Part.NO_ALLOCATION, ports = ports)
+        super().__init__(identifier=identifier, ports=ports)
 
 class Top(Part):
-    def __init__(self, identifier):
-        parts = [
-            Rigid_Body_Simulator('simulator'),
-            Multirotor('multirotor'),
-            Timer('timer'),
-            Broadcaster('broadcaster_time', outputs = 2)
-        ]
-        super().__init__(identifier, Part.SEQUENTIAL_ALLOCATION, parts = parts)
-        self.connect(self.get_part('simulator').get_port('multirotor_position'), self.get_part('multirotor').get_port('position'))
-        self.connect(self.get_part('simulator').get_port('multirotor_orientation'), self.get_part('multirotor').get_port('orientation'))
-        self.connect(self.get_part('simulator').get_port('multirotor_linear_speed'), self.get_part('multirotor').get_port('linear_speed'))
-        self.connect(self.get_part('simulator').get_port('multirotor_angular_speed'), self.get_part('multirotor').get_port('angular_speed'))
-        self.connect(self.get_part('timer').get_port('time'), self.get_part('broadcaster_time').get_port('in'))
-        self.connect(self.get_part('broadcaster_time').get_port('out_0'), self.get_part('simulator').get_port('time'))
-        self.connect(self.get_part('broadcaster_time').get_port('out_1'), self.get_part('multirotor').get_port('time'))
-        for i in PROPELLERS_INDEXES:
-            self.connect(self.get_part('multirotor').get_port(f'thrust_{i}'), self.get_part('simulator').get_port(f'multirotor_thrust_{i}'))
-            self.connect(self.get_part('multirotor').get_port(f'torque_{i}'), self.get_part('simulator').get_port(f'multirotor_torque_{i}'))
-        self.add_hook('init', self.init_simulation_engine)
+    def __init__(self, identifier: str):
+        event_queues = [EventQueue('time_event_in', EventQueue.IN, size=1)]
+        parts = {
+            'time_dist': EventToDataSynchronizer('time_dist', 'time_event_in', 'time_out'),
+            'simulator': Rigid_Body_Simulator('simulator'),
+            'multirotor': Multirotor('multirotor')
+        }
+        super().__init__(identifier=identifier, execution_strategy=sequential_execution, parts=parts, event_queues=event_queues)
+        
+        # Connect the top-level event queue to the time distributor
+        self.connect_event_queue(self.get_event_queue('time_event_in'), self.get_part('time_dist').get_event_queue('time_event_in'))
+        
+        # Connect the time distributor's data output to the simulator and multirotor
+        time_out_port = self.get_part('time_dist').get_port('time_out')
+        self.connect(time_out_port, self.get_part('simulator').get_port('time'))
+        self.connect(time_out_port, self.get_part('multirotor').get_port('time'))
+        
+        # Connect the simulator and multirotor together
+        simulator = self.get_part('simulator')
+        multirotor = self.get_part('multirotor')
+        self.connect(simulator.get_port('multirotor_position'), multirotor.get_port('position'))
+        self.connect(simulator.get_port('multirotor_orientation'), multirotor.get_port('orientation'))
+        # ... and other connections from simulator to multirotor ...
+
+        self.add_hook('init', self._init_pybullet)
+        self.add_hook('term', self._term_pybullet)
 ```
 
 As it's possible to understand, `class Multirotor` defines its ports, the parts it's composed of (motors, propellers, sensors, the trajectory_planner and the controller) and their connections. All these parts are further defined in their specific subfolders, such as `./motor`, `./propeller`, and so on. This kind of description is called *structural* and allows building hierarchies. `class Rigid_Body_Simulator` provides instead an example of *behavioral* description:
@@ -196,12 +195,29 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 * When, moreover, thrusts and torques are updated by the multirotor model, they are applied to the avatar and the simulation engine is stepped
 
 `class Top` finally aggregates the simulator, the multirotor model and a timer whose role is updating the time with a specific periodicity. This allows to run a "real time" simulation, provided that all computations are able to terminate within that period. To perform the simulation one can simply instantiate that class and run the timer:
+`class Top` finally aggregates the simulator and the multirotor model. It is driven by an external `Timer` (an `EventSource`) that provides time events. This allows running a "real time" simulation, provided that all computations are able to terminate within the timer's period. To perform the simulation, one can instantiate these components and run them in separate threads:
 
 ```python
 top = Top('top')
-
+# Initialize the simulation to set up pybullet and get the physics time step
 top.init()
-top.get_part('timer').run(t_end = None)
+t_step = top.t_step
+
+# Create the external timer event source using the time step from the physics engine
+timer = Timer(identifier='physics_timer', interval_seconds=t_step)
+
+# Connect the timer to the simulation's main event queue
+top.connect_event_source(timer, 'time_event_in')
+
+# Start the simulation and timer threads
+top.start(stop_condition=lambda p: timer.stop_event.is_set())
+timer.start()
+
+# Wait for threads to complete...
+top.join()
+timer.join()
+
+# Terminate hooks (e.g., disconnect pybullet)
 top.term()
 ```
 
