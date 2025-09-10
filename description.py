@@ -201,11 +201,12 @@ class Rigid_Body_Simulator(Part):
         # Check if motor inputs are ready and apply forces if they are.
         # This uses the control inputs calculated in the previous simulation step.
         if all(p.is_updated() for p in self.thrust_ports) and all(p.is_updated() for p in self.torque_ports):
-            for i in PROPELLERS_INDEXES:
-                thrust = self.thrust_ports[i-1].get()
-                torque = self.torque_ports[i-1].get()
-                self.engine.applyExternalForce(self.multirotor_avatar, i-1, thrust, [0, 0, 0], self.engine.LINK_FRAME)
-                self.engine.applyExternalTorque(self.multirotor_avatar, i-1, torque, self.engine.LINK_FRAME)
+            for i, (thrust_port, torque_port) in enumerate(zip(self.thrust_ports, self.torque_ports)):
+                thrust = thrust_port.get()
+                torque = torque_port.get()
+                # The link index `i` from enumerate is 0-based, which matches PyBullet's link indexing.
+                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
+                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
 
         try:
             # The call to stepSimulation should be unconditional to ensure the
