@@ -74,7 +74,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
 
 <a href="#figure-3">Figure 3</a> shows the high-level structure of the `Multirotor` model (the diagram has been generated with [openformatproj/diagrams](https://github.com/openformatproj/diagrams)). The `Top` component encapsulates the `Multirotor` model and the `Rigid_Body_Simulator`. The entire simulation is driven by an external `Timer` (an `EventSource`), which provides time-tick events to the `Top` part. This event-driven approach ensures that the simulation only executes when a time step is required.
 
-Here's a snippet of how the environment is built at the code level (`description.py`):
+Here's a snippet of how the environment is built at the code level (`src/description.py`):
 
 ```python
 from ml.engine import Part, Port, EventQueue, sequential_execution
@@ -119,7 +119,7 @@ class Multirotor(Part):
         )
         
         # Connect time, position, orientation, etc. to inner parts
-        # ... (connection logic as in description.py) ...
+        # ... (connection logic as in src/description.py) ...
 
 class Rigid_Body_Simulator(Part):
     def behavior(self):
@@ -195,27 +195,28 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 top = Top('top')
 # Initialize the simulation to set up pybullet and get the physics time step
 top.init()
-t_step = top.t_step
 
 # Create the external timer event source using the time step from the physics engine
-timer = Timer(identifier='physics_timer', interval_seconds=t_step)
+timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=OnFullBehavior.FAIL)
 
 # Connect the timer to the simulation's main event queue
 top.connect_event_source(timer, 'time_event_in')
 
 # Start the simulation and timer threads
-top.start(stop_condition=lambda p: timer.stop_event.is_set())
+top.start(stop_condition=lambda p: timer.stop_event_is_set())
 timer.start()
 
-# Wait for threads to complete...
+# Wait for the main simulation thread to finish, for any reason (e.g., completion, error, or user interrupt)
 top.join()
+timer.stop()
+# Wait for the timer thread to exit
 timer.join()
 
 # Terminate hooks (e.g., disconnect pybullet)
 top.term()
 ```
 
-This is exactly what the script `run.py` available in the Docker image does.
+This is exactly what the script `run.py` available in the Docker image does by calling the function `simulate()` in `src/runs.py`.
 
 For more information about the ml engine, read the [documentation](https://openformatproj.github.io/ml-docs/).
 
