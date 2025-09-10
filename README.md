@@ -63,6 +63,8 @@ SET_SPEED = lambda t : [w * (-sin(w*t)), w * cos(w*t), a * q * cos(q*t)]
 
 This behavior can be easily changed from the script itself.
 
+The content of this repository is available in the `/workspaces/multirotor/src` folder of the Docker image.
+
 # Overview
 
 The idea in this case is to define the behavior of bottom-level components (motors, propellers, sensors, the trajectory planner, and the controller), build a multirotor model by attaching their ports together, connect such a model to a simulator, and run it.
