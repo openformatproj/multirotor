@@ -143,7 +143,9 @@ class Rigid_Body_Simulator(Part):
                     torque = torque_ports[i-1].get()
                     self.engine.applyExternalForce(self.multirotor_avatar, i-1, thrust, [0, 0, 0], self.engine.LINK_FRAME)
                     self.engine.applyExternalTorque(self.multirotor_avatar, i-1, torque, self.engine.LINK_FRAME)
-                self.engine.stepSimulation()
+
+            # Unconditionally advance the physics simulation to keep it in sync with the timer.
+            self.engine.stepSimulation()
 
     def __init__(self, identifier: str):
         ports = [
