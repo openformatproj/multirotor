@@ -45,13 +45,13 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         top.init()
 
         # Create the external timer event source
-        # The timer interval is now driven by the central configuration.
-        # The `on_full` policy is set to `OnFullBehavior.FAIL`. This ensures
-        # that every physics step is processed, preventing instability. The
-        # system will stop with a queue full error if it cannot keep up, which
-        # is the correct behavior for a real-time simulation that misses its
-        # deadline.
-        timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=OnFullBehavior.OVERWRITE)
+        # The `on_full` policy is determined by the REAL_TIME_SIMULATION flag.
+        # In real-time mode (`FAIL`), the simulation stops if it cannot keep up
+        # with the timer, which is crucial for exposing performance bottlenecks.
+        # In non-real-time mode (`OVERWRITE`), it drops events to keep running,
+        # which can be useful for non-critical runs or debugging.
+        on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.OVERWRITE
+        timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior)
 
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
