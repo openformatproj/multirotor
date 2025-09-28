@@ -79,14 +79,14 @@ The idea in this case is to define the behavior of bottom-level components (moto
 Here's a snippet of how the environment is built at the code level (`src/description.py`):
 
 ```python
-from ml.engine import Part, Port, EventQueue, sequential_execution
+from ml.engine import Part, Port, EventQueue
+from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
-from ml.event_sources import Timer
 import conf
 from propeller.description import Propeller
 from motor.description import Motor
 from sensors.description import Sensors
-from trajectory_planner.behavior import Trajectory_Planner
+from trajectory_planner.structure import Trajectory_Planner
 from controller.description import Controller
 from constants import X, Y, Z
 
@@ -102,7 +102,7 @@ class Multirotor(Part):
             Port('angular_speed', Port.IN)
         ]
         parts = {
-            'sensors': Sensors('sensors', conf.PLOT),
+            'sensors': Sensors('sensors'),
             'trajectory_planner': Trajectory_Planner('trajectory_planner', conf.SET_POSITION, conf.SET_SPEED),
             'controller': Controller('controller', PROPELLERS_INDEXES)
         }
@@ -125,48 +125,58 @@ class Multirotor(Part):
 
 class Rigid_Body_Simulator(Part):
     def behavior(self):
-        time_port = self.get_port('time')
-        if time_port.is_updated():
-            # Consume the time input to allow the simulation to advance
-            time_port.get()
+        if not self.engine or not self.engine.isConnected():
+            raise RuntimeError("PyBullet physics engine is not connected.")
 
-            position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
-            self.get_port('multirotor_position').set(position)
-            # ... (set other sensor outputs) ...
+        # Apply forces from the previous control cycle if inputs are ready.
+        if all(p.is_updated() for p in self.thrust_ports) and all(p.is_updated() for p in self.torque_ports):
+            for i, (thrust_port, torque_port) in enumerate(zip(self.thrust_ports, self.torque_ports)):
+                thrust = thrust_port.get()
+                torque = torque_port.get()
+                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
+                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
 
-            # Check if all motor inputs are ready before applying forces
-            thrust_ports = [self.get_port(f'multirotor_thrust_{i}') for i in PROPELLERS_INDEXES]
-            torque_ports = [self.get_port(f'multirotor_torque_{i}') for i in PROPELLERS_INDEXES]
-            if all(p.is_updated() for p in thrust_ports) and all(p.is_updated() for p in torque_ports):
-                for i in PROPELLERS_INDEXES:
-                    thrust = thrust_ports[i-1].get()
-                    torque = torque_ports[i-1].get()
-                    self.engine.applyExternalForce(self.multirotor_avatar, i-1, thrust, [0, 0, 0], self.engine.LINK_FRAME)
-                    self.engine.applyExternalTorque(self.multirotor_avatar, i-1, torque, self.engine.LINK_FRAME)
-
-            # Unconditionally advance the physics simulation to keep it in sync with the timer.
+        try:
+            # The call to stepSimulation is unconditional to ensure the physics world
+            # always advances in time, preventing instability.
             self.engine.stepSimulation()
+        except self.engine.error as e:
+            raise RuntimeError("PyBullet simulation step failed.") from e
+
+        # Read the new state and set output ports for the next control cycle.
+        position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
+        self.get_port('multirotor_position').set(position)
+        self.get_port('multirotor_orientation').set(orientation)
+        linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
+        self.get_port('multirotor_linear_speed').set(linear_speed)
+        self.get_port('multirotor_angular_speed').set(angular_speed)
 
     def __init__(self, identifier: str):
         ports = [
             Port('time', Port.IN),
             Port('multirotor_position', Port.OUT),
-            # ... (other ports) ...
+            Port('multirotor_orientation', Port.OUT),
+            Port('multirotor_linear_speed', Port.OUT),
+            Port('multirotor_angular_speed', Port.OUT)
         ]
         for i in PROPELLERS_INDEXES:
             ports.append(Port(f'multirotor_thrust_{i}', Port.IN))
             ports.append(Port(f'multirotor_torque_{i}', Port.IN))
-        super().__init__(identifier=identifier, ports=ports)
+        super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port('time').is_updated())
 
 class Top(Part):
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, execution_strategy=sequential_execution):
         event_queues = [EventQueue('time_event_in', EventQueue.IN, size=1)]
         parts = {
-            'time_dist': EventToDataSynchronizer('time_dist', 'time_event_in', 'time_out'),
+            'time_dist': EventToDataSynchronizer(
+                'time_dist',
+                input_queue_id='time_event_in',
+                output_port_id='time_out'
+            ),
             'simulator': Rigid_Body_Simulator('simulator'),
             'multirotor': Multirotor('multirotor')
         }
-        super().__init__(identifier=identifier, execution_strategy=sequential_execution, parts=parts, event_queues=event_queues)
+        super().__init__(identifier=identifier, execution_strategy=execution_strategy, parts=parts, event_queues=event_queues)
         
         # Connect the top-level event queue to the time distributor
         self.connect_event_queue(self.get_event_queue('time_event_in'), self.get_part('time_dist').get_event_queue('time_event_in'))
@@ -182,6 +192,9 @@ class Top(Part):
         self.connect(simulator.get_port('multirotor_position'), multirotor.get_port('position'))
         self.connect(simulator.get_port('multirotor_orientation'), multirotor.get_port('orientation'))
         # ... and other connections from simulator to multirotor ...
+        for i in PROPELLERS_INDEXES:
+            self.connect(multirotor.get_port(f'thrust_{i}'), simulator.get_port(f'multirotor_thrust_{i}'))
+            self.connect(multirotor.get_port(f'torque_{i}'), simulator.get_port(f'multirotor_torque_{i}'))
 
         self.add_hook('init', self._init_pybullet)
         self.add_hook('term', self._term_pybullet)
