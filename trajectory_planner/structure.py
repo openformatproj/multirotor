@@ -1,5 +1,6 @@
 from decimal import Decimal
-from ml.engine import Part, Port, sequential_execution
+from ml.engine import Part, Port
+from ml.strategies import sequential_execution
 from ml.parts import Operator
 from constants import X, Y, Z
 

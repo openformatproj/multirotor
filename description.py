@@ -1,8 +1,8 @@
-from ml.engine import Part, Port, EventQueue, sequential_execution
+from ml.engine import Part, Port, EventQueue
+from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
 import pybullet
 from decimal import getcontext
-import matplotlib.pyplot as plt
 import os
 import sys
 from ml.tracer import Tracer
@@ -17,6 +17,7 @@ from motor.description import Motor
 from sensors.description import Sensors
 from trajectory_planner.structure import Trajectory_Planner
 from controller.description import Controller
+from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
 
 # TODO: Refactor data transfer to use dedicated data classes for all physical quantities.
@@ -50,46 +51,6 @@ class Multirotor(Part):
     interfaces for receiving sensor data from the simulator and providing
     actuator outputs (thrust and torque) back to it.
     """
-    def init_plots(self):
-        """
-        Initialization hook that sets up the matplotlib plots for visualizing
-        simulation data in real-time.
-        """
-        plt.ion()
-        fig, ((ax_xy_position, ax_xy_speed), (ax_z_position, ax_z_speed)) = plt.subplots(2, 2)
-        xy_position, = ax_xy_position.plot([], [], 'ro')
-        line_xy_position, = ax_xy_position.plot([], [], '-')
-        ax_xy_position.set_title("XY position")
-        ax_xy_position.set_xlim(conf.POSITION_GRAPH_BOUNDARIES[X.index()][0], conf.POSITION_GRAPH_BOUNDARIES[X.index()][1])
-        ax_xy_position.set_ylim(conf.POSITION_GRAPH_BOUNDARIES[Y.index()][0], conf.POSITION_GRAPH_BOUNDARIES[Y.index()][1])
-        ax_xy_position.set_aspect('equal', adjustable='box')
-        xy_speed, = ax_xy_speed.plot([], [], 'ro')
-        line_xy_speed, = ax_xy_speed.plot([], [], '-')
-        ax_xy_speed.set_title("XY speed")
-        ax_xy_speed.set_xlim(conf.SPEED_GRAPH_BOUNDARIES[X.index()][0], conf.SPEED_GRAPH_BOUNDARIES[X.index()][1])
-        ax_xy_speed.set_ylim(conf.SPEED_GRAPH_BOUNDARIES[Y.index()][0], conf.SPEED_GRAPH_BOUNDARIES[Y.index()][1])
-        ax_xy_speed.set_aspect('equal', adjustable='box')
-        z_position, = ax_z_position.plot([], [], 'ro')
-        line_z_position, = ax_z_position.plot([], [], '-')
-        ax_z_position.set_title("Z position")
-        ax_z_position.set_xlim(conf.POSITION_GRAPH_BOUNDARIES[X.index()][0], conf.POSITION_GRAPH_BOUNDARIES[X.index()][1])
-        ax_z_position.set_ylim(conf.POSITION_GRAPH_BOUNDARIES[Z.index()][0], conf.POSITION_GRAPH_BOUNDARIES[Z.index()][1])
-        ax_z_position.set_aspect('equal', adjustable='box')
-        z_speed, = ax_z_speed.plot([], [], 'ro')
-        line_z_speed, = ax_z_speed.plot([], [], '-')
-        ax_z_speed.set_title("Z speed")
-        ax_z_speed.set_xlim(conf.SPEED_GRAPH_BOUNDARIES[X.index()][0], conf.SPEED_GRAPH_BOUNDARIES[X.index()][1])
-        ax_z_speed.set_ylim(conf.SPEED_GRAPH_BOUNDARIES[Z.index()][0], conf.SPEED_GRAPH_BOUNDARIES[Z.index()][1])
-        ax_z_speed.set_aspect('equal', adjustable='box')
-        self.get_part('sensors').set_plot(fig, ax_xy_position, xy_position, line_xy_position, xy_speed, ax_xy_speed, line_xy_speed, ax_z_position, z_position, line_z_position, ax_z_speed, z_speed, line_z_speed)
-
-    def term_plots(self):
-        """
-        Termination hook that displays the final plots after the simulation
-        has completed.
-        """
-        plt.ioff()
-        plt.show()
 
     def __init__(self, identifier: str):
         """
@@ -106,10 +67,18 @@ class Multirotor(Part):
             Port('angular_speed', Port.IN)
         ]
         parts = {
-            'sensors': Sensors('sensors', conf.PLOT),
+            'sensors': Sensors('sensors'),
             'trajectory_planner': Trajectory_Planner('trajectory_planner', conf.SET_POSITION, conf.SET_SPEED),
             'controller': Controller('controller', PROPELLERS_INDEXES)
         }
+        if conf.PLOT:
+            parts['plotter'] = XYZ_Monitor(
+                'plotter',
+                position_bounds=conf.POSITION_GRAPH_BOUNDARIES,
+                speed_bounds=conf.SPEED_GRAPH_BOUNDARIES,
+                plot_decimation=conf.PLOT_DECIMATION
+            )
+
         for i in PROPELLERS_INDEXES:
             ports.append(Port(f'thrust_{i}', Port.OUT))
             ports.append(Port(f'torque_{i}', Port.OUT))
@@ -149,9 +118,13 @@ class Multirotor(Part):
             self.connect(self.get_part(f'motor_{i}').get_port('angular_speed_out'), self.get_part(f'propeller_{i}').get_port('angular_speed'))
             self.connect(self.get_part(f'propeller_{i}').get_port(f'thrust'), self.get_port(f'thrust_{i}'))
             self.connect(self.get_part(f'motor_{i}').get_port(f'reaction_torque'), self.get_port(f'torque_{i}'))
+        
         if conf.PLOT:
-            self.add_hook('init', self.init_plots)
-            self.add_hook('term', self.term_plots)
+            plotter = self.get_part('plotter')
+            sensors = self.get_part('sensors')
+            plot_ports = ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']
+            for name in plot_ports:
+                self.connect(sensors.get_port(name), plotter.get_port(name))
 
 
 class Rigid_Body_Simulator(Part):
@@ -300,12 +273,13 @@ class Top(Part):
         if self.engine and self.engine.isConnected():
             self.engine.disconnect()
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, execution_strategy=sequential_execution):
         """
         Initializes the Top structural part.
 
         Args:
             identifier (str): The unique name for this part.
+            execution_strategy: The strategy for executing inner parts.
         """
         self.engine = None
         event_queues = [EventQueue('time_event_in', EventQueue.IN, size=1)]
@@ -320,7 +294,7 @@ class Top(Part):
         }
         super().__init__(
             identifier=identifier,
-            execution_strategy=sequential_execution,
+            execution_strategy=execution_strategy,
             parts=parts,
             event_queues=event_queues
         )

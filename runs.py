@@ -1,15 +1,21 @@
 import os
 import sys
+
+# Add the 'src' directory to the Python path to allow for absolute imports
+# of modules within the project (e.g., 'plotting', 'description').
+# This must be done before any project-specific imports.
+sys.path.append(os.path.dirname(__file__))
+
 import json
 from functools import partial
 from PyQt5.QtWidgets import QApplication
+from ml.strategies import sequential_execution, MainThreadPartitioningStrategy
 from ml.event_sources import Timer
 from ml.tracer import Tracer
 from ml.enums import OnFullBehavior, LogLevel
 from diagrams.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
 from diagrams.optimization import run_simulated_annealing
-sys.path.append(os.path.dirname(__file__))
 from datetime import datetime
 from description import Top
 import conf
@@ -29,6 +35,9 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     conf.PLOT = PLOT
     conf.GUI = GUI
 
+    # Setup the execution strategy
+    execution_strategy = MainThreadPartitioningStrategy('plotter') if conf.PLOT else sequential_execution
+
     # Start the tracer
     Tracer.start(
         level=LogLevel.TRACE,
@@ -39,7 +48,8 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     )
 
     try:
-        top = Top('top')
+        # Pass the queue to the top-level part if plotting is enabled.
+        top = Top('top', execution_strategy=execution_strategy)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -56,21 +66,35 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
 
-        # Start the simulation and timer threads.
+        if conf.PLOT:
+            # The plotter part will be found and executed by the strategy in the main thread.
+            plotter_part = top.get_part('multirotor').get_part('plotter')
+
         Tracer.log(LogLevel.INFO, "MAIN", "START", {"message": f"Starting simulation threads on {datetime.now()}"})
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
 
         try:
-            # Wait for the main simulation thread to finish, for any reason
-            # (e.g., completion, error, or user interrupt).
-            top.join()
+            if conf.PLOT:
+                # The main loop simply needs to keep the application responsive
+                # and allow the plotter to execute when scheduled.
+                while top.is_running():
+                    assert isinstance(execution_strategy, MainThreadPartitioningStrategy)
+                    execution_strategy.execute_main_thread_part()
+                    QApplication.processEvents() # Keep GUI responsive
+                plotter_part.teardown() # Show final plot after sim ends
+            else:
+                top.wait()
         except KeyboardInterrupt:
             Tracer.log(LogLevel.INFO, "MAIN", "INTERRUPT", {"message": "Ctrl+C received, stopping simulation."})
         finally:
             # Ensure all threads are stopped gracefully, regardless of how the loop ended.
             timer.stop()
-            timer.join() # Wait for the timer thread to exit.
+            # The 'top' Part manages a thread. We check if that thread is still
+            # running before attempting to wait it to prevent errors on shutdown.
+            if top.is_running():
+                top.wait()
+            timer.wait() # Wait for the timer thread to exit.
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, "MAIN", "FAILURE", {"message": "Simulation finished with errors."})

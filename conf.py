@@ -19,6 +19,9 @@ G = -9.81
 
 REAL_TIME_SIMULATION = False
 
+# Decimation factor for plotting. A value of N means 1 out of every N data points will be plotted.
+PLOT_DECIMATION = 100
+
 INITIAL_POSITION = None
 INITIAL_ROTATION = None
 SET_POSITION = None
