@@ -20,25 +20,6 @@ from controller.description import Controller
 from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
 
-# TODO: Refactor data transfer to use dedicated data classes for all physical quantities.
-#
-# The current implementation uses primitive types (e.g., `Decimal`, `np.array`)
-# for all data transfers between parts. This creates implicit contracts about
-# the structure and meaning of data (e.g., is this array a position or a
-# velocity?), making the system brittle and harder to understand.
-#
-# A more robust, object-oriented approach is to create dedicated data classes
-# for all physical quantities.
-#
-# The refactoring plan is:
-# 1.  Create a new `datatypes.py` file.
-# 2.  Define classes for all physical quantities, such as `Position`,
-#     `Velocity`, `Angle`, `AngularRate`, `Thrust`, and `Torque`. These
-#     classes should encapsulate the data and provide any necessary helper
-#     methods (e.g., `as_pybullet_vector()`).
-# 3.  Refactor all parts (`Sensors`, `Trajectory_Planner`, `Controller`, etc.)
-#     to use these new data types on their ports instead of primitive types.
-
 PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
 
 class Multirotor(Part):
