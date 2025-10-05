@@ -1,7 +1,9 @@
-import sys
 from PyQt5.QtWidgets import QApplication
+import matplotlib
+matplotlib.use('Qt5Agg') # Must be called before importing pyplot
 import matplotlib.pyplot as plt
 from ml.engine import Part, Port
+from typing import List
 
 class XYZ_Monitor(Part):
     """
@@ -16,28 +18,29 @@ class XYZ_Monitor(Part):
         self.history_trim = history_trim
         self.plot_decimation = plot_decimation
 
-        ports = [Port(name, Port.IN) for name in ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']]
-        # The scheduling condition ensures this part only runs when all its inputs are updated.
+        ports: List[Port] = [Port(name, Port.IN) for name in ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']]
+        ports.append(Port('time', Port.IN))
         super().__init__(
             identifier=identifier,
             ports=ports,
             scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN))
         )
 
+        self.add_hook('init', self._init_plot)
+        self.add_hook('term', self._term_plot)
+
         # Plotting attributes
-        self.app = None
         self.fig = None
         self.plot_elements = {}
         self.plot_history = {
             'x': [], 'y': [], 'z': [], 'zeros': [],
             'x_speed': [], 'y_speed': [], 'z_speed': []
         }
-        self._is_setup = False
         self._plot_counter = 0
 
-    def setup(self):
+    def _init_plot(self):
         """Creates and configures the matplotlib figure and axes."""
-        self.app = QApplication.instance() or QApplication(sys.argv)
+        
         plt.ion()
         self.fig, ((ax_xy_pos, ax_xy_spd), (ax_z_pos, ax_z_spd)) = plt.subplots(2, 2)
         
@@ -54,15 +57,14 @@ class XYZ_Monitor(Part):
         ax_z_pos.set_title("Z position"); ax_z_pos.set_xlim(*self.position_bounds[0]); ax_z_pos.set_ylim(*self.position_bounds[2]); ax_z_pos.set_aspect('equal', adjustable='box')
         ax_z_spd.set_title("Z speed"); ax_z_spd.set_xlim(*self.speed_bounds[0]); ax_z_spd.set_ylim(*self.speed_bounds[2]); ax_z_spd.set_aspect('equal', adjustable='box')
 
+        app = QApplication.instance()
+        if not app:
+            raise RuntimeError("A QApplication instance must be created before calling init().")
+
         plt.show(block=False)
-        self._is_setup = True
 
     def behavior(self):
         """The 'behavior' is to update the plot with new data from input ports."""
-        # The scheduling condition guarantees all ports are updated, so we can get data directly.
-        if not self._is_setup:
-            # Lazy setup on first execution
-            self.setup()
 
         # Handle plot decimation internally
         self._plot_counter += 1
@@ -91,11 +93,8 @@ class XYZ_Monitor(Part):
 
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-        # Process GUI events as part of the behavior to keep the window responsive.
-        if self.app and isinstance(self.app, QApplication):
-            self.app.processEvents() # process all pending events
 
-    def teardown(self):
+    def _term_plot(self):
         """Turns off interactive mode and shows the final plot until closed."""
         if self.fig:
             plt.ioff()

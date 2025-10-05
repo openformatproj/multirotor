@@ -104,6 +104,7 @@ class Multirotor(Part):
             plotter = self.get_part('plotter')
             sensors = self.get_part('sensors')
             plot_ports = ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']
+            self.connect(self.get_port('time'), plotter.get_port('time'))
             for name in plot_ports:
                 self.connect(sensors.get_port(name), plotter.get_port(name))
 

@@ -7,9 +7,10 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 import json
+import time
 from functools import partial
 from PyQt5.QtWidgets import QApplication
-from ml.strategies import sequential_execution, MainThreadPartitioningStrategy
+from ml.strategies import sequential_execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer
 from ml.enums import OnFullBehavior, LogLevel
@@ -35,21 +36,17 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     conf.PLOT = PLOT
     conf.GUI = GUI
 
-    # Setup the execution strategy
-    execution_strategy = MainThreadPartitioningStrategy('plotter') if conf.PLOT else sequential_execution
-
-    # Start the tracer
-    Tracer.start(
-        level=LogLevel.TRACE,
-        flush_interval_seconds=5.0,
-        output_file=TRACE_FILENAME,
-        log_to_console=True,
-        error_file=ERROR_FILENAME
-    )
-
     try:
-        # Pass the queue to the top-level part if plotting is enabled.
-        top = Top('top', execution_strategy=execution_strategy)
+        # Start the tracer
+        Tracer.start(
+            level=LogLevel.TRACE,
+            flush_interval_seconds=5.0,
+            output_file=TRACE_FILENAME,
+            log_to_console=True,
+            error_file=ERROR_FILENAME
+        )
+
+        top = Top('top', execution_strategy=sequential_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -58,52 +55,39 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         # The `on_full` policy is determined by the REAL_TIME_SIMULATION flag.
         # In real-time mode (`FAIL`), the simulation stops if it cannot keep up
         # with the timer, which is crucial for exposing performance bottlenecks.
-        # In non-real-time mode (`OVERWRITE`), it drops events to keep running,
+        # In non-real-time mode (`DROP`), it drops events to keep running,
         # which can be useful for non-critical runs or debugging.
-        on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.OVERWRITE
+        on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
         timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior)
 
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
 
-        if conf.PLOT:
-            # The plotter part will be found and executed by the strategy in the main thread.
-            plotter_part = top.get_part('multirotor').get_part('plotter')
-
         Tracer.log(LogLevel.INFO, "MAIN", "START", {"message": f"Starting simulation threads on {datetime.now()}"})
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
 
-        try:
-            if conf.PLOT:
-                # The main loop simply needs to keep the application responsive
-                # and allow the plotter to execute when scheduled.
-                while top.is_running():
-                    assert isinstance(execution_strategy, MainThreadPartitioningStrategy)
-                    execution_strategy.execute_main_thread_part()
-                    QApplication.processEvents() # Keep GUI responsive
-                plotter_part.teardown() # Show final plot after sim ends
-            else:
-                top.wait()
-        except KeyboardInterrupt:
-            Tracer.log(LogLevel.INFO, "MAIN", "INTERRUPT", {"message": "Ctrl+C received, stopping simulation."})
-        finally:
-            # Ensure all threads are stopped gracefully, regardless of how the loop ended.
-            timer.stop()
-            # The 'top' Part manages a thread. We check if that thread is still
-            # running before attempting to wait it to prevent errors on shutdown.
-            if top.is_running():
-                top.wait()
-            timer.wait() # Wait for the timer thread to exit.
+        if conf.PLOT:
+            while top.is_running():
+                QApplication.processEvents() # Keep GUI responsive
+                time.sleep(1) # Prevent 100% CPU usage
+        else:
+            top.wait() # Block until the simulation ends
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, "MAIN", "FAILURE", {"message": "Simulation finished with errors."})
         else:
             Tracer.log(LogLevel.INFO, "MAIN", "SUCCESS", {"message": "Simulation finished."})
 
+    except KeyboardInterrupt:
+        Tracer.log(LogLevel.INFO, "MAIN", "INTERRUPT", {"message": "Ctrl+C received, stopping simulation."})
     finally:
         # Terminate hooks (e.g., disconnect pybullet) and stop the tracer
-        if 'top' in locals() and top:
+        # This block ensures cleanup happens on normal exit or Ctrl+C.
+        if 'timer' in locals() and timer:
+            timer.stop()
+            timer.wait()
+        if 'top' in locals() and top: # top.wait() is implicitly handled by the loop exit
             top.term()
         Tracer.stop()
 
@@ -141,7 +125,7 @@ def import_diagram():
         json_data = f.read()
 
     # A QApplication instance is always required for a Qt app.
-    app = QApplication(sys.argv)
+    qapp = QApplication(sys.argv)
 
     # --- Configure Optimizer ---
     # Use Simulated Annealing as the optimization strategy.
