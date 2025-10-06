@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(__file__))
 
 import json
 import time
+import multiprocessing
 from functools import partial
 from PyQt5.QtWidgets import QApplication
 from ml.strategies import sequential_execution
@@ -18,6 +19,7 @@ from diagrams.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
 from diagrams.optimization import run_simulated_annealing
 from datetime import datetime
+from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
 
@@ -36,7 +38,18 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     conf.PLOT = PLOT
     conf.GUI = GUI
 
+    plot_server_process = None
     try:
+        if conf.PLOT:
+            print("Starting plot server process...")
+            plot_server_process = multiprocessing.Process(
+                target=run_plot_server,
+                args=(conf.POSITION_GRAPH_BOUNDARIES, conf.SPEED_GRAPH_BOUNDARIES)
+            )
+            plot_server_process.start()
+            # Wait a moment for the server to initialize and start listening
+            time.sleep(1.5)
+
         # Start the tracer
         Tracer.start(
             level=LogLevel.TRACE,
@@ -67,12 +80,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
 
-        if conf.PLOT:
-            while top.is_running():
-                QApplication.processEvents() # Keep GUI responsive
-                time.sleep(1) # Prevent 100% CPU usage
-        else:
-            top.wait() # Block until the simulation ends
+        top.wait() # Block until the simulation ends
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, "MAIN", "FAILURE", {"message": "Simulation finished with errors."})
@@ -89,6 +97,9 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
             timer.wait()
         if 'top' in locals() and top: # top.wait() is implicitly handled by the loop exit
             top.term()
+        if plot_server_process and plot_server_process.is_alive():
+            print("Terminating plot server process...")
+            plot_server_process.terminate()
         Tracer.stop()
 
 def export_diagram():

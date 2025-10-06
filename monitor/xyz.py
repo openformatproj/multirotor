@@ -1,101 +1,78 @@
-from PyQt5.QtWidgets import QApplication
-import matplotlib
-matplotlib.use('Qt5Agg') # Must be called before importing pyplot
-import matplotlib.pyplot as plt
+import socket
+import json
 from ml.engine import Part, Port
-from typing import List
+from ml.tracer import Tracer
+from ml.enums import LogLevel
 
 class XYZ_Monitor(Part):
     """
-    A self-contained Part that handles all XYZ monitoring and plotting logic.
-    It is designed to be executed in the main application thread, consuming
-    data from its input ports which are fed by the simulation thread.
+    A behavioral part that acts as a client to a remote plotting server.
+
+    It receives time, position, and speed data from the simulation,
+    serializes it into JSON, and sends it over a TCP socket to a server
+    responsible for visualization.
     """
-    def __init__(self, identifier: str, position_bounds, speed_bounds, plot_decimation, history_length=30, history_trim=2):
-        self.position_bounds = position_bounds
-        self.speed_bounds = speed_bounds
-        self.history_length = history_length
-        self.history_trim = history_trim
+    def __init__(self, identifier: str, plot_decimation: int, host: str = '127.0.0.1', port: int = 65432):
+        """
+        Initializes the XYZ_Monitor client.
+
+        Args:
+            identifier (str): The unique name for this part.
+            plot_decimation (int): Send data only every Nth call to reduce network traffic.
+            host (str): The hostname or IP address of the plotting server.
+            port (int): The port number of the plotting server.
+        """
+        ports = [
+            Port('time', Port.IN),
+            Port('x', Port.IN), Port('y', Port.IN), Port('z', Port.IN),
+            Port('x_speed', Port.IN), Port('y_speed', Port.IN), Port('z_speed', Port.IN)
+        ]
+        super().__init__(identifier, ports=ports, scheduling_condition=lambda p: p.get_port('time').is_updated())
+
+        self.host = host
+        self.port = port
         self.plot_decimation = plot_decimation
+        self.tick_counter = 0
+        self.socket = None
 
-        ports: List[Port] = [Port(name, Port.IN) for name in ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']]
-        ports.append(Port('time', Port.IN))
-        super().__init__(
-            identifier=identifier,
-            ports=ports,
-            scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN))
-        )
+        self.add_hook('init', self._connect_to_server)
+        self.add_hook('term', self._disconnect_from_server)
 
-        self.add_hook('init', self._init_plot)
-        self.add_hook('term', self._term_plot)
+    def _connect_to_server(self):
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.host, self.port))
+            Tracer.log(LogLevel.INFO, self.get_identifier(), "CONNECT", {"host": self.host, "port": self.port})
+        except ConnectionRefusedError:
+            Tracer.log(LogLevel.ERROR, self.get_identifier(), "CONNECT_FAIL", {"message": "Connection refused. Is the plot_server running?"})
+            self.socket = None # Ensure socket is None on failure
 
-        # Plotting attributes
-        self.fig = None
-        self.plot_elements = {}
-        self.plot_history = {
-            'x': [], 'y': [], 'z': [], 'zeros': [],
-            'x_speed': [], 'y_speed': [], 'z_speed': []
-        }
-        self._plot_counter = 0
-
-    def _init_plot(self):
-        """Creates and configures the matplotlib figure and axes."""
-        
-        plt.ion()
-        self.fig, ((ax_xy_pos, ax_xy_spd), (ax_z_pos, ax_z_spd)) = plt.subplots(2, 2)
-        
-        elements = {
-            'xy_pos_marker': ax_xy_pos.plot([], [], 'ro')[0], 'xy_pos_line': ax_xy_pos.plot([], [], '-')[0],
-            'xy_spd_marker': ax_xy_spd.plot([], [], 'ro')[0], 'xy_spd_line': ax_xy_spd.plot([], [], '-')[0],
-            'z_pos_marker': ax_z_pos.plot([], [], 'ro')[0], 'z_pos_line': ax_z_pos.plot([], [], '-')[0],
-            'z_spd_marker': ax_z_spd.plot([], [], 'ro')[0], 'z_spd_line': ax_z_spd.plot([], [], '-')[0],
-        }
-        self.plot_elements = elements
-
-        ax_xy_pos.set_title("XY position"); ax_xy_pos.set_xlim(*self.position_bounds[0]); ax_xy_pos.set_ylim(*self.position_bounds[1]); ax_xy_pos.set_aspect('equal', adjustable='box')
-        ax_xy_spd.set_title("XY speed"); ax_xy_spd.set_xlim(*self.speed_bounds[0]); ax_xy_spd.set_ylim(*self.speed_bounds[1]); ax_xy_spd.set_aspect('equal', adjustable='box')
-        ax_z_pos.set_title("Z position"); ax_z_pos.set_xlim(*self.position_bounds[0]); ax_z_pos.set_ylim(*self.position_bounds[2]); ax_z_pos.set_aspect('equal', adjustable='box')
-        ax_z_spd.set_title("Z speed"); ax_z_spd.set_xlim(*self.speed_bounds[0]); ax_z_spd.set_ylim(*self.speed_bounds[2]); ax_z_spd.set_aspect('equal', adjustable='box')
-
-        app = QApplication.instance()
-        if not app:
-            raise RuntimeError("A QApplication instance must be created before calling init().")
-
-        plt.show(block=False)
+    def _disconnect_from_server(self):
+        if self.socket:
+            self.socket.close()
+            Tracer.log(LogLevel.INFO, self.get_identifier(), "DISCONNECT", {})
 
     def behavior(self):
-        """The 'behavior' is to update the plot with new data from input ports."""
+        if not self.socket:
+            return # Do nothing if not connected
 
-        # Handle plot decimation internally
-        self._plot_counter += 1
-        if self.plot_decimation <= 0 or self._plot_counter % self.plot_decimation != 0:
-            # Skip this update to reduce plot frequency
+        self.tick_counter += 1
+        if self.tick_counter % self.plot_decimation != 0:
             return
 
-        current_data = {p.get_identifier(): p.get() for p in self.get_ports(Port.IN) if p.is_updated()}
-        
-        for key in ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']:
-            self.plot_history[key].append(float(current_data.get(key, 0.0)))
-        self.plot_history['zeros'].append(0.0)
+        data_point = {
+            't': float(self.get_port('time').get()),
+            'x': float(self.get_port('x').get()),
+            'y': float(self.get_port('y').get()),
+            'z': float(self.get_port('z').get()),
+            'x_speed': float(self.get_port('x_speed').get()),
+            'y_speed': float(self.get_port('y_speed').get()),
+            'z_speed': float(self.get_port('z_speed').get()),
+        }
 
-        if len(self.plot_history['x']) >= self.history_length:
-            for data_array in self.plot_history.values():
-                del data_array[:self.history_trim]
-
-        self.plot_elements['xy_pos_line'].set_data(self.plot_history['x'], self.plot_history['y'])
-        self.plot_elements['xy_pos_marker'].set_data([current_data.get('x',0)], [current_data.get('y',0)])
-        self.plot_elements['z_pos_line'].set_data(self.plot_history['zeros'], self.plot_history['z'])
-        self.plot_elements['z_pos_marker'].set_data([0.0], [current_data.get('z',0)])
-        self.plot_elements['xy_spd_line'].set_data(self.plot_history['x_speed'], self.plot_history['y_speed'])
-        self.plot_elements['xy_spd_marker'].set_data([current_data.get('x_speed',0)], [current_data.get('y_speed',0)])
-        self.plot_elements['z_spd_line'].set_data(self.plot_history['zeros'], self.plot_history['z_speed'])
-        self.plot_elements['z_spd_marker'].set_data([0.0], [current_data.get('z_speed',0)])
-
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-
-    def _term_plot(self):
-        """Turns off interactive mode and shows the final plot until closed."""
-        if self.fig:
-            plt.ioff()
-            plt.show()
+        try:
+            message = json.dumps(data_point) + '\n'
+            self.socket.sendall(message.encode('utf-8'))
+        except (BrokenPipeError, ConnectionResetError):
+            Tracer.log(LogLevel.WARNING, self.get_identifier(), "SEND_FAIL", {"message": "Connection to server lost."})
+            self.socket = None # Stop trying to send

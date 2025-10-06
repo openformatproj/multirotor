@@ -55,8 +55,6 @@ class Multirotor(Part):
         if conf.PLOT:
             parts['plotter'] = XYZ_Monitor(
                 'plotter',
-                position_bounds=conf.POSITION_GRAPH_BOUNDARIES,
-                speed_bounds=conf.SPEED_GRAPH_BOUNDARIES,
                 plot_decimation=conf.PLOT_DECIMATION
             )
 
