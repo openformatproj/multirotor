@@ -27,6 +27,31 @@ TRACE_FILENAME = "outs/multirotor_trace.log"
 ERROR_FILENAME = "outs/multirotor_errors.log"
 STRUCTURE_FILENAME = "outs/multirotor_structure.json"
 
+# --- Log constants ---
+MAIN_COMPONENT_ID = "MAIN"
+LOG_EVENT_START = "START"
+LOG_EVENT_FAILURE = "FAILURE"
+LOG_EVENT_SUCCESS = "SUCCESS"
+LOG_EVENT_INTERRUPT = "INTERRUPT"
+LOG_DETAIL_KEY_MESSAGE = "message"
+MSG_SIM_START = "Starting simulation threads on {}"
+MSG_SIM_FAILURE = "Simulation finished with errors."
+MSG_SIM_SUCCESS = "Simulation finished."
+MSG_INTERRUPT = "Ctrl+C received, stopping simulation."
+MSG_PLOT_SERVER_STARTING = "Starting plot server process..."
+MSG_SHUTDOWN_COMPLETE = "All components terminated. Flushing final logs."
+
+# --- Diagram utility messages ---
+MSG_DIAG_INSTANTIATING = "Instantiating the simulation model..."
+MSG_DIAG_PART_FOUND = "Found part to serialize: '{}'"
+MSG_DIAG_SERIALIZING = "Serializing part structure to JSON..."
+MSG_DIAG_EXPORT_SUCCESS = "\nSuccessfully exported the structure of '{}' to '{}'"
+MSG_DIAG_EXPORT_ERROR = "\nError: {}"
+MSG_DIAG_FILE_NOT_FOUND = "Error: JSON file '{}' not found. Please run with 'export' argument first."
+MSG_DIAG_LOADING = "Loading diagram from '{}'..."
+MSG_DIAG_IMPORT_SUCCESS = "Diagram imported successfully."
+MSG_DIAG_IMPORT_ERROR = "Error importing diagram: {}"
+
 def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SET_SPEED=None, POSITION_GRAPH_BOUNDARIES=None, SPEED_GRAPH_BOUNDARIES=None, PLOT=None, GUI=None):
 
     conf.INITIAL_POSITION = INITIAL_POSITION
@@ -41,7 +66,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     plot_server_process = None
     try:
         if conf.PLOT:
-            print("Starting plot server process...")
+            print(MSG_PLOT_SERVER_STARTING)
             plot_server_process = multiprocessing.Process(
                 target=run_plot_server,
                 args=(conf.POSITION_GRAPH_BOUNDARIES, conf.SPEED_GRAPH_BOUNDARIES)
@@ -76,21 +101,20 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
 
-        Tracer.log(LogLevel.INFO, "MAIN", "START", {"message": f"Starting simulation threads on {datetime.now()}"})
+        Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_START, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_START.format(datetime.now())})
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
 
         top.wait() # Block until the simulation ends
 
         if top.get_exception() or timer.get_exception():
-            Tracer.log(LogLevel.ERROR, "MAIN", "FAILURE", {"message": "Simulation finished with errors."})
+            Tracer.log(LogLevel.ERROR, MAIN_COMPONENT_ID, LOG_EVENT_FAILURE, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_FAILURE})
         else:
-            Tracer.log(LogLevel.INFO, "MAIN", "SUCCESS", {"message": "Simulation finished."})
+            Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_SUCCESS})
 
     except KeyboardInterrupt:
-        Tracer.log(LogLevel.INFO, "MAIN", "INTERRUPT", {"message": "Ctrl+C received, stopping simulation."})
+        Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
     finally:
-        # Terminate hooks (e.g., disconnect pybullet) and stop the tracer
         # This block ensures cleanup happens on normal exit or Ctrl+C.
         if 'timer' in locals() and timer:
             timer.stop()
@@ -107,31 +131,31 @@ def export_diagram():
     Instantiates the Multirotor model, serializes its structure to JSON,
     and saves it to a file.
     """
-    print("Instantiating the simulation model...")
+    print(MSG_DIAG_INSTANTIATING)
     top = Top('top')
     multirotor_part = top.get_part('multirotor')
-    print(f"Found part to serialize: '{multirotor_part.get_identifier()}'")
+    print(MSG_DIAG_PART_FOUND.format(multirotor_part.get_identifier()))
 
     serializer = DiagramSerializer()
 
     try:
-        print("Serializing part structure to JSON...")
+        print(MSG_DIAG_SERIALIZING)
         json_output = serializer.export_part_to_json(multirotor_part)
         with open(STRUCTURE_FILENAME, 'w') as f:
             f.write(json_output)
-        print(f"\nSuccessfully exported the structure of '{multirotor_part.get_identifier()}' to '{STRUCTURE_FILENAME}'")
+        print(MSG_DIAG_EXPORT_SUCCESS.format(multirotor_part.get_identifier(), STRUCTURE_FILENAME))
     except TypeError as e:
-        print(f"\nError: {e}")
+        print(MSG_DIAG_EXPORT_ERROR.format(e))
 
 def import_diagram():
     """
     Loads a diagram from the JSON file and displays it in the editor.
     """
     if not os.path.exists(STRUCTURE_FILENAME):
-        print(f"Error: JSON file '{STRUCTURE_FILENAME}' not found. Please run with 'export' argument first.")
+        print(MSG_DIAG_FILE_NOT_FOUND.format(STRUCTURE_FILENAME))
         return
 
-    print(f"Loading diagram from '{STRUCTURE_FILENAME}'...")
+    print(MSG_DIAG_LOADING.format(STRUCTURE_FILENAME))
     with open(STRUCTURE_FILENAME, 'r') as f:
         json_data = f.read()
 
@@ -157,9 +181,9 @@ def import_diagram():
     # Import the data and build the diagram
     try:
         serializer.import_part_from_json(json_data, main_window)
-        print("Diagram imported successfully.")
+        print(MSG_DIAG_IMPORT_SUCCESS)
     except (ValueError, json.JSONDecodeError) as e:
-        print(f"Error importing diagram: {e}")
+        print(MSG_DIAG_IMPORT_ERROR.format(e))
         return
 
     # Start the application event loop to show the window.

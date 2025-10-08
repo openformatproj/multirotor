@@ -3,6 +3,18 @@ import json
 from ml.engine import Part, Port
 from ml.tracer import Tracer
 from ml.enums import LogLevel
+from . import conf as monitor_conf
+
+# --- Log constants ---
+LOG_EVENT_CONNECT = "CONNECT"
+LOG_EVENT_CONNECT_FAIL = "CONNECT_FAIL"
+LOG_EVENT_DISCONNECT = "DISCONNECT"
+LOG_EVENT_SEND_FAIL = "SEND_FAIL"
+LOG_DETAIL_KEY_HOST = "host"
+LOG_DETAIL_KEY_PORT = "port"
+LOG_DETAIL_KEY_MESSAGE = "message"
+MSG_CONNECTION_REFUSED = "Connection refused. Is the plot_server running?"
+MSG_CONNECTION_LOST = "Connection to server lost."
 
 class XYZ_Monitor(Part):
     """
@@ -12,7 +24,7 @@ class XYZ_Monitor(Part):
     serializes it into JSON, and sends it over a TCP socket to a server
     responsible for visualization.
     """
-    def __init__(self, identifier: str, plot_decimation: int, host: str = '127.0.0.1', port: int = 65432):
+    def __init__(self, identifier: str, plot_decimation: int, host: str = monitor_conf.DEFAULT_HOST, port: int = monitor_conf.DEFAULT_PORT):
         """
         Initializes the XYZ_Monitor client.
 
@@ -42,15 +54,15 @@ class XYZ_Monitor(Part):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
-            Tracer.log(LogLevel.INFO, self.get_identifier(), "CONNECT", {"host": self.host, "port": self.port})
+            Tracer.log(LogLevel.INFO, self.get_identifier(), LOG_EVENT_CONNECT, {LOG_DETAIL_KEY_HOST: self.host, LOG_DETAIL_KEY_PORT: self.port})
         except ConnectionRefusedError:
-            Tracer.log(LogLevel.ERROR, self.get_identifier(), "CONNECT_FAIL", {"message": "Connection refused. Is the plot_server running?"})
+            Tracer.log(LogLevel.ERROR, self.get_identifier(), LOG_EVENT_CONNECT_FAIL, {LOG_DETAIL_KEY_MESSAGE: MSG_CONNECTION_REFUSED})
             self.socket = None # Ensure socket is None on failure
 
     def _disconnect_from_server(self):
         if self.socket:
             self.socket.close()
-            Tracer.log(LogLevel.INFO, self.get_identifier(), "DISCONNECT", {})
+            Tracer.log(LogLevel.INFO, self.get_identifier(), LOG_EVENT_DISCONNECT, {})
 
     def behavior(self):
         if not self.socket:
@@ -74,5 +86,5 @@ class XYZ_Monitor(Part):
             message = json.dumps(data_point) + '\n'
             self.socket.sendall(message.encode('utf-8'))
         except (BrokenPipeError, ConnectionResetError):
-            Tracer.log(LogLevel.WARNING, self.get_identifier(), "SEND_FAIL", {"message": "Connection to server lost."})
+            Tracer.log(LogLevel.WARNING, self.get_identifier(), LOG_EVENT_SEND_FAIL, {LOG_DETAIL_KEY_MESSAGE: MSG_CONNECTION_LOST})
             self.socket = None # Stop trying to send

@@ -22,6 +22,59 @@ from constants import X, Y, Z
 
 PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
 
+# --- Component Identifiers ---
+SENSORS_ID = 'sensors'
+TRAJECTORY_PLANNER_ID = 'trajectory_planner'
+CONTROLLER_ID = 'controller'
+PLOTTER_ID = 'plotter'
+MOTOR_ID_TPL = 'motor_{}'
+PROPELLER_ID_TPL = 'propeller_{}'
+SIMULATOR_ID = 'simulator'
+MULTIROT_ID = 'multirotor'
+TIME_DIST_ID = 'time_dist'
+
+# --- Port Identifiers ---
+TIME_PORT = 'time'
+POSITION_PORT = 'position'
+ORIENTATION_PORT = 'orientation'
+LINEAR_SPEED_PORT = 'linear_speed'
+ANGULAR_SPEED_PORT = 'angular_speed'
+THRUST_PORT_TPL = 'thrust_{}'
+TORQUE_PORT_TPL = 'torque_{}'
+ROLL_PORT = 'roll'
+PITCH_PORT = 'pitch'
+YAW_PORT = 'yaw'
+ROLL_SPEED_PORT = 'roll_speed'
+PITCH_SPEED_PORT = 'pitch_speed'
+YAW_SPEED_PORT = 'yaw_speed'
+SPEED_PORT_TPL = '{}_speed'
+SPEED_SETPOINT_PORT_TPL = '{}_speed_setpoint'
+YAW_SPEED_SETPOINT_PORT = 'yaw_speed_setpoint'
+ANGULAR_SPEED_PORT_TPL = 'angular_speed_{}'
+ANGULAR_SPEED_IN_PORT = 'angular_speed_in'
+ANGULAR_SPEED_OUT_PORT = 'angular_speed_out'
+REACTION_TORQUE_PORT = 'reaction_torque'
+MULTIROT_POSITION_PORT = 'multirotor_position'
+MULTIROT_ORIENTATION_PORT = 'multirotor_orientation'
+MULTIROT_LINEAR_SPEED_PORT = 'multirotor_linear_speed'
+MULTIROT_ANGULAR_SPEED_PORT = 'multirotor_angular_speed'
+MULTIROT_THRUST_PORT_TPL = 'multirotor_thrust_{}'
+MULTIROT_TORQUE_PORT_TPL = 'multirotor_torque_{}'
+TIME_OUT_PORT = 'time_out'
+TIME_EVENT_IN_Q = 'time_event_in'
+
+# --- Error Messages ---
+ERR_URDF_NOT_FOUND = "URDF model file not found at {}. Generation failed."
+ERR_URDF_LOAD_FAILED = "Failed to load URDF model {}: {}"
+ERR_PYBULLET_NOT_CONNECTED = "PyBullet engine not connected."
+ERR_PYBULLET_STEP_FAILED = "PyBullet simulation step failed."
+ERR_PYBULLET_CONNECT_FAILED = "Failed to connect to PyBullet in '{}' mode."
+ERR_PYBULLET_CONNECT_NO_EXCEPTION = "PyBullet connection failed without exception."
+
+# --- Log constants ---
+LOG_EVENT_STEP = "STEP"
+LOG_DETAIL_KEY_CONNECTED = "connected"
+
 class Multirotor(Part):
     """
     A structural part representing the multirotor vehicle.
@@ -41,29 +94,29 @@ class Multirotor(Part):
             identifier (str): The unique name for this part.
         """
         ports = [
-            Port('time', Port.IN),
-            Port('position', Port.IN),
-            Port('orientation', Port.IN),
-            Port('linear_speed', Port.IN),
-            Port('angular_speed', Port.IN)
+            Port(TIME_PORT, Port.IN),
+            Port(POSITION_PORT, Port.IN),
+            Port(ORIENTATION_PORT, Port.IN),
+            Port(LINEAR_SPEED_PORT, Port.IN),
+            Port(ANGULAR_SPEED_PORT, Port.IN)
         ]
         parts = {
-            'sensors': Sensors('sensors'),
-            'trajectory_planner': Trajectory_Planner('trajectory_planner', conf.SET_POSITION, conf.SET_SPEED),
-            'controller': Controller('controller', PROPELLERS_INDEXES)
+            SENSORS_ID: Sensors(SENSORS_ID),
+            TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf.SET_POSITION, conf.SET_SPEED),
+            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES)
         }
         if conf.PLOT:
-            parts['plotter'] = XYZ_Monitor(
-                'plotter',
+            parts[PLOTTER_ID] = XYZ_Monitor(
+                PLOTTER_ID,
                 plot_decimation=conf.PLOT_DECIMATION
             )
 
         for i in PROPELLERS_INDEXES:
-            ports.append(Port(f'thrust_{i}', Port.OUT))
-            ports.append(Port(f'torque_{i}', Port.OUT))
-            parts[f'motor_{i}'] = Motor(f'motor_{i}')
+            ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
+            ports.append(Port(TORQUE_PORT_TPL.format(i), Port.OUT))
+            parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i))
             direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
-            parts[f'propeller_{i}'] = Propeller(f'propeller_{i}', direction)
+            parts[PROPELLER_ID_TPL.format(i)] = Propeller(PROPELLER_ID_TPL.format(i), direction)
             
         super().__init__(
             identifier=identifier,
@@ -72,37 +125,37 @@ class Multirotor(Part):
             parts=parts
         )
         
-        self.connect(self.get_port('time'), self.get_part('sensors').get_port('time'))
-        self.connect(self.get_port('time'), self.get_part('trajectory_planner').get_port('time'))
-        self.connect(self.get_port('time'), self.get_part('controller').get_port('time'))
-        self.connect(self.get_port('position'), self.get_part('sensors').get_port('position'))
-        self.connect(self.get_port('orientation'), self.get_part('sensors').get_port('orientation'))
-        self.connect(self.get_port('linear_speed'), self.get_part('sensors').get_port('linear_speed'))
-        self.connect(self.get_port('angular_speed'), self.get_part('sensors').get_port('angular_speed'))
-        self.connect(self.get_part('sensors').get_port('roll'), self.get_part('controller').get_port('roll'))
-        self.connect(self.get_part('sensors').get_port('pitch'), self.get_part('controller').get_port('pitch'))
-        self.connect(self.get_part('sensors').get_port('yaw'), self.get_part('trajectory_planner').get_port('yaw'))
-        self.connect(self.get_part('sensors').get_port('roll_speed'), self.get_part('controller').get_port('roll_speed'))
-        self.connect(self.get_part('sensors').get_port('pitch_speed'), self.get_part('controller').get_port('pitch_speed'))
-        self.connect(self.get_part('sensors').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed'))
+        self.connect(self.get_port(TIME_PORT), self.get_part(SENSORS_ID).get_port(TIME_PORT))
+        self.connect(self.get_port(TIME_PORT), self.get_part(TRAJECTORY_PLANNER_ID).get_port(TIME_PORT))
+        self.connect(self.get_port(TIME_PORT), self.get_part(CONTROLLER_ID).get_port(TIME_PORT))
+        self.connect(self.get_port(POSITION_PORT), self.get_part(SENSORS_ID).get_port(POSITION_PORT))
+        self.connect(self.get_port(ORIENTATION_PORT), self.get_part(SENSORS_ID).get_port(ORIENTATION_PORT))
+        self.connect(self.get_port(LINEAR_SPEED_PORT), self.get_part(SENSORS_ID).get_port(LINEAR_SPEED_PORT))
+        self.connect(self.get_port(ANGULAR_SPEED_PORT), self.get_part(SENSORS_ID).get_port(ANGULAR_SPEED_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(ROLL_PORT), self.get_part(CONTROLLER_ID).get_port(ROLL_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(PITCH_PORT), self.get_part(CONTROLLER_ID).get_port(PITCH_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(YAW_PORT), self.get_part(TRAJECTORY_PLANNER_ID).get_port(YAW_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(ROLL_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(ROLL_SPEED_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(PITCH_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(PITCH_SPEED_PORT))
+        self.connect(self.get_part(SENSORS_ID).get_port(YAW_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(YAW_SPEED_PORT))
         for i in [X, Y, Z]:
-            self.connect(self.get_part('sensors').get_port(i.name()), self.get_part('trajectory_planner').get_port(i.name()))
-            self.connect(self.get_part('trajectory_planner').get_port(f'{i.name()}_speed'), self.get_part('controller').get_port(f'{i.name()}_speed_setpoint'))
-            self.connect(self.get_part('sensors').get_port(f'{i.name()}_speed'), self.get_part('controller').get_port(f'{i.name()}_speed'))
-        self.connect(self.get_part('trajectory_planner').get_port('yaw_speed'), self.get_part('controller').get_port('yaw_speed_setpoint'))
+            self.connect(self.get_part(SENSORS_ID).get_port(i.name()), self.get_part(TRAJECTORY_PLANNER_ID).get_port(i.name()))
+            self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_SETPOINT_PORT_TPL.format(i.name())))
+            self.connect(self.get_part(SENSORS_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_PORT_TPL.format(i.name())))
+        self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(YAW_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(YAW_SPEED_SETPOINT_PORT))
         for i in PROPELLERS_INDEXES:
-            self.connect(self.get_port('time'), self.get_part(f'propeller_{i}').get_port('time'))
-            self.connect(self.get_port('time'), self.get_part(f'motor_{i}').get_port('time'))
-            self.connect(self.get_part('controller').get_port(f'angular_speed_{i}'), self.get_part(f'motor_{i}').get_port('angular_speed_in'))
-            self.connect(self.get_part(f'motor_{i}').get_port('angular_speed_out'), self.get_part(f'propeller_{i}').get_port('angular_speed'))
-            self.connect(self.get_part(f'propeller_{i}').get_port(f'thrust'), self.get_port(f'thrust_{i}'))
-            self.connect(self.get_part(f'motor_{i}').get_port(f'reaction_torque'), self.get_port(f'torque_{i}'))
+            self.connect(self.get_port(TIME_PORT), self.get_part(PROPELLER_ID_TPL.format(i)).get_port(TIME_PORT))
+            self.connect(self.get_port(TIME_PORT), self.get_part(MOTOR_ID_TPL.format(i)).get_port(TIME_PORT))
+            self.connect(self.get_part(CONTROLLER_ID).get_port(ANGULAR_SPEED_PORT_TPL.format(i)), self.get_part(MOTOR_ID_TPL.format(i)).get_port(ANGULAR_SPEED_IN_PORT))
+            self.connect(self.get_part(MOTOR_ID_TPL.format(i)).get_port(ANGULAR_SPEED_OUT_PORT), self.get_part(PROPELLER_ID_TPL.format(i)).get_port(ANGULAR_SPEED_PORT))
+            self.connect(self.get_part(PROPELLER_ID_TPL.format(i)).get_port('thrust'), self.get_port(THRUST_PORT_TPL.format(i)))
+            self.connect(self.get_part(MOTOR_ID_TPL.format(i)).get_port(REACTION_TORQUE_PORT), self.get_port(TORQUE_PORT_TPL.format(i)))
         
         if conf.PLOT:
-            plotter = self.get_part('plotter')
-            sensors = self.get_part('sensors')
+            plotter = self.get_part(PLOTTER_ID)
+            sensors = self.get_part(SENSORS_ID)
             plot_ports = ['x', 'y', 'z', 'x_speed', 'y_speed', 'z_speed']
-            self.connect(self.get_port('time'), plotter.get_port('time'))
+            self.connect(self.get_port(TIME_PORT), plotter.get_port(TIME_PORT))
             for name in plot_ports:
                 self.connect(sensors.get_port(name), plotter.get_port(name))
 
@@ -128,12 +181,12 @@ class Rigid_Body_Simulator(Part):
             generate_urdf_model(conf.BASE_DIRECTORY, conf.URDF_MODEL, conf.URDF_TEMPLATE, conf.FRAME_MASS, conf.FRAME_SIZE, conf.PROPELLERS, conf.MAIN_RADIUS)
         
         if not os.path.exists(conf.URDF_MODEL):
-            raise FileNotFoundError(f"URDF model file not found at {conf.URDF_MODEL}. Generation might have failed.")
+            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(conf.URDF_MODEL))
 
         try:
             self.multirotor_avatar = self.engine.loadURDF(conf.URDF_MODEL, conf.INITIAL_POSITION, self.engine.getQuaternionFromEuler(conf.INITIAL_ROTATION))
         except self.engine.error as e:
-            raise RuntimeError(f"Failed to load URDF model {conf.URDF_MODEL}: {e}") from e
+            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(conf.URDF_MODEL, e))
 
     def behavior(self):
         """
@@ -147,9 +200,9 @@ class Rigid_Body_Simulator(Part):
         if not self.engine or not self.engine.isConnected():
             # If the physics engine is not connected, we cannot proceed.
             # Raise an exception to stop the simulation thread gracefully.
-            raise RuntimeError("PyBullet physics engine is not connected.")
+            raise RuntimeError(ERR_PYBULLET_NOT_CONNECTED)
 
-        Tracer.log(LogLevel.DEBUG, "SIMULATOR", "STEP", {"connected": self.engine.isConnected()})
+        Tracer.log(LogLevel.DEBUG, self.get_identifier(), LOG_EVENT_STEP, {LOG_DETAIL_KEY_CONNECTED: self.engine.isConnected()})
 
         # Check if motor inputs are ready and apply forces if they are.
         # This uses the control inputs calculated in the previous simulation step.
@@ -169,15 +222,15 @@ class Rigid_Body_Simulator(Part):
             # Re-raise the specific PyBullet error as a more general RuntimeError.
             # This makes it more likely that the simulation framework will catch it
             # and trigger a clean shutdown, even in fire_and_forget mode.
-            raise RuntimeError("PyBullet simulation step failed. This might be due to an unstable simulation (e.g., the time step is too small).") from e
+            raise RuntimeError(ERR_PYBULLET_STEP_FAILED) from e
 
         # After stepping, read the new state and set the output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
-        self.get_port('multirotor_position').set(position)
-        self.get_port('multirotor_orientation').set(orientation)
+        self.get_port(MULTIROT_POSITION_PORT).set(position)
+        self.get_port(MULTIROT_ORIENTATION_PORT).set(orientation)
         linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
-        self.get_port('multirotor_linear_speed').set(linear_speed)
-        self.get_port('multirotor_angular_speed').set(angular_speed)
+        self.get_port(MULTIROT_LINEAR_SPEED_PORT).set(linear_speed)
+        self.get_port(MULTIROT_ANGULAR_SPEED_PORT).set(angular_speed)
 
     def __init__(self, identifier: str):
         """
@@ -187,20 +240,20 @@ class Rigid_Body_Simulator(Part):
             identifier (str): The unique name for this part.
         """
         ports = [
-            Port('time', Port.IN),
-            Port('multirotor_position', Port.OUT),
-            Port('multirotor_orientation', Port.OUT),
-            Port('multirotor_linear_speed', Port.OUT),
-            Port('multirotor_angular_speed', Port.OUT)
+            Port(TIME_PORT, Port.IN),
+            Port(MULTIROT_POSITION_PORT, Port.OUT),
+            Port(MULTIROT_ORIENTATION_PORT, Port.OUT),
+            Port(MULTIROT_LINEAR_SPEED_PORT, Port.OUT),
+            Port(MULTIROT_ANGULAR_SPEED_PORT, Port.OUT)
         ]
         for i in PROPELLERS_INDEXES:
-            ports.append(Port(f'multirotor_thrust_{i}', Port.IN))
-            ports.append(Port(f'multirotor_torque_{i}', Port.IN))
-        super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port('time').is_updated())
+            ports.append(Port(MULTIROT_THRUST_PORT_TPL.format(i), Port.IN))
+            ports.append(Port(MULTIROT_TORQUE_PORT_TPL.format(i), Port.IN))
+        super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
         self.engine = None
         self.multirotor_avatar = None
-        self.thrust_ports = [self.get_port(f'multirotor_thrust_{i}') for i in PROPELLERS_INDEXES]
-        self.torque_ports = [self.get_port(f'multirotor_torque_{i}') for i in PROPELLERS_INDEXES]
+        self.thrust_ports = [self.get_port(MULTIROT_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        self.torque_ports = [self.get_port(MULTIROT_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
 
 
 class Top(Part):
@@ -231,19 +284,19 @@ class Top(Part):
         except self.engine.error as e:
             # Re-raise pybullet's specific error as a more general RuntimeError
             # with context, which will be handled by the main run loop.
-            raise RuntimeError(f"Failed to connect to PyBullet in mode '{mode_str}'. If running without a display, ensure PLOT is False.") from e
+            raise RuntimeError(ERR_PYBULLET_CONNECT_FAILED.format(mode_str)) from e
 
         if not self.engine.isConnected():
             # This is a fallback for the unlikely case that connect() returns
             # without error but fails to establish a connection.
-            raise RuntimeError("Failed to connect to PyBullet engine, but no exception was raised.")
+            raise RuntimeError(ERR_PYBULLET_CONNECT_NO_EXCEPTION)
 
         # Configure the physics engine. This is critical for stability.
         self.engine.setGravity(0, 0, conf.G)
         self.engine.setTimeStep(conf.TIME_STEP)
         self.engine.setRealTimeSimulation(0) # We are driving the simulation manually
 
-        self.get_part('simulator')._set_engine(self.engine)
+        self.get_part(SIMULATOR_ID)._set_engine(self.engine)
 
     def _term_pybullet(self):
         """
@@ -262,15 +315,15 @@ class Top(Part):
             execution_strategy: The strategy for executing inner parts.
         """
         self.engine = None
-        event_queues = [EventQueue('time_event_in', EventQueue.IN, size=1)]
+        event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
-            'time_dist': EventToDataSynchronizer(
-                'time_dist',
-                input_queue_id='time_event_in',
-                output_port_id='time_out'
+            TIME_DIST_ID: EventToDataSynchronizer(
+                TIME_DIST_ID,
+                input_queue_id=TIME_EVENT_IN_Q,
+                output_port_id=TIME_OUT_PORT
             ),
-            'simulator': Rigid_Body_Simulator('simulator'),
-            'multirotor': Multirotor('multirotor')
+            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID),
+            MULTIROT_ID: Multirotor(MULTIROT_ID)
         }
         super().__init__(
             identifier=identifier,
@@ -280,22 +333,22 @@ class Top(Part):
         )
         getcontext().prec = conf.DECIMAL_CONTEXT_PRECISION
         
-        time_dist = self.get_part('time_dist')
-        simulator = self.get_part('simulator')
-        multirotor = self.get_part('multirotor')
+        time_dist = self.get_part(TIME_DIST_ID)
+        simulator = self.get_part(SIMULATOR_ID)
+        multirotor = self.get_part(MULTIROT_ID)
 
-        self.connect_event_queue(self.get_event_queue('time_event_in'), time_dist.get_event_queue('time_event_in'))
+        self.connect_event_queue(self.get_event_queue(TIME_EVENT_IN_Q), time_dist.get_event_queue(TIME_EVENT_IN_Q))
         
-        time_out_port = time_dist.get_port('time_out')
-        self.connect(time_out_port, simulator.get_port('time'))
-        self.connect(time_out_port, multirotor.get_port('time'))
+        time_out_port = time_dist.get_port(TIME_OUT_PORT)
+        self.connect(time_out_port, simulator.get_port(TIME_PORT))
+        self.connect(time_out_port, multirotor.get_port(TIME_PORT))
         
-        self.connect(self.get_part('simulator').get_port('multirotor_position'), self.get_part('multirotor').get_port('position'))
-        self.connect(self.get_part('simulator').get_port('multirotor_orientation'), self.get_part('multirotor').get_port('orientation'))
-        self.connect(self.get_part('simulator').get_port('multirotor_linear_speed'), self.get_part('multirotor').get_port('linear_speed'))
-        self.connect(self.get_part('simulator').get_port('multirotor_angular_speed'), self.get_part('multirotor').get_port('angular_speed'))
+        self.connect(simulator.get_port(MULTIROT_POSITION_PORT), multirotor.get_port(POSITION_PORT))
+        self.connect(simulator.get_port(MULTIROT_ORIENTATION_PORT), multirotor.get_port(ORIENTATION_PORT))
+        self.connect(simulator.get_port(MULTIROT_LINEAR_SPEED_PORT), multirotor.get_port(LINEAR_SPEED_PORT))
+        self.connect(simulator.get_port(MULTIROT_ANGULAR_SPEED_PORT), multirotor.get_port(ANGULAR_SPEED_PORT))
         for i in PROPELLERS_INDEXES:
-            self.connect(self.get_part('multirotor').get_port(f'thrust_{i}'), self.get_part('simulator').get_port(f'multirotor_thrust_{i}'))
-            self.connect(self.get_part('multirotor').get_port(f'torque_{i}'), self.get_part('simulator').get_port(f'multirotor_torque_{i}'))
+            self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROT_THRUST_PORT_TPL.format(i)))
+            self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROT_TORQUE_PORT_TPL.format(i)))
         self.add_hook('init', self._init_pybullet)
         self.add_hook('term', self._term_pybullet)
