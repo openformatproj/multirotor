@@ -78,7 +78,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
 
         # Start the tracer
         Tracer.start(
-            level=LogLevel.TRACE,
+            level=LogLevel.DEBUG,
             flush_interval_seconds=5.0,
             output_file=TRACE_FILENAME,
             log_to_console=True,
