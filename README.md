@@ -210,7 +210,7 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 The `Timer`'s `on_full` policy is critical. Using `OnFullBehavior.FAIL` (as shown below) enforces strict real-time execution by stopping the simulation if a deadline is missed. This is the recommended mode for validating system performance. The alternative, `OnFullBehavior.OVERWRITE`, allows the simulation to continue by dropping events, which can be useful for non-critical analysis.
 
 ```python
-top = Top('top')
+top = Top('top', execution_strategy=sequential_execution)
 # Initialize the simulation to set up pybullet and get the physics time step
 top.init()
 
@@ -225,10 +225,11 @@ top.start(stop_condition=lambda p: timer.stop_event_is_set())
 timer.start()
 
 # Wait for the main simulation thread to finish, for any reason (e.g., completion, error, or user interrupt)
-top.join()
+top.wait()
+
 timer.stop()
 # Wait for the timer thread to exit
-timer.join()
+timer.wait()
 
 # Terminate hooks (e.g., disconnect pybullet)
 top.term()
