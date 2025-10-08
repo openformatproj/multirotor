@@ -71,6 +71,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
                 target=run_plot_server,
                 args=(conf.POSITION_GRAPH_BOUNDARIES, conf.SPEED_GRAPH_BOUNDARIES)
             )
+            plot_server_process.daemon = True  # Ensure the process exits with the main script
             plot_server_process.start()
             # Wait a moment for the server to initialize and start listening
             time.sleep(1.5)
@@ -116,14 +117,21 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
     finally:
         # This block ensures cleanup happens on normal exit or Ctrl+C.
+        # The order is important for a graceful shutdown and correct user feedback.
+        
+        # 1. Stop the timer and simulation threads first.
         if 'timer' in locals() and timer:
             timer.stop()
             timer.wait()
         if 'top' in locals() and top: # top.wait() is implicitly handled by the loop exit
             top.term()
+
+        # 2. Terminate the plot server process if it's still running.
         if plot_server_process and plot_server_process.is_alive():
-            print("Terminating plot server process...")
             plot_server_process.terminate()
+
+        # 3. Stop the tracer. This is a blocking call that flushes final logs.
+        Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
         Tracer.stop()
 
 def export_diagram():
