@@ -86,12 +86,13 @@ class Multirotor(Part):
     actuator outputs (thrust and torque) back to it.
     """
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, execution_strategy=sequential_execution):
         """
         Initializes the Multirotor structural part.
 
         Args:
             identifier (str): The unique name for this part.
+            execution_strategy: The execution strategy for the controller.
         """
         ports = [
             Port(TIME_PORT, Port.IN),
@@ -103,7 +104,7 @@ class Multirotor(Part):
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf.SET_POSITION, conf.SET_SPEED),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES)
+            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, execution_strategy=execution_strategy)
         }
         if conf.PLOT:
             parts[PLOTTER_ID] = XYZ_Monitor(
@@ -306,13 +307,15 @@ class Top(Part):
         if self.engine and self.engine.isConnected():
             self.engine.disconnect()
 
-    def __init__(self, identifier: str, execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
         """
         Initializes the Top structural part.
 
         Args:
             identifier (str): The unique name for this part.
             execution_strategy: The strategy for executing inner parts.
+            controller_execution_strategy: The execution strategy for the controller,
+                                           passed down to the Multirotor part.
         """
         self.engine = None
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
@@ -323,7 +326,7 @@ class Top(Part):
                 output_port_id=TIME_OUT_PORT
             ),
             SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID),
-            MULTIROT_ID: Multirotor(MULTIROT_ID)
+            MULTIROT_ID: Multirotor(MULTIROT_ID, execution_strategy=controller_execution_strategy)
         }
         super().__init__(
             identifier=identifier,
