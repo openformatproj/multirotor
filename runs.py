@@ -7,6 +7,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 import json
+import threading
 import time
 import multiprocessing
 from functools import partial
@@ -52,6 +53,66 @@ MSG_DIAG_LOADING = "Loading diagram from '{}'..."
 MSG_DIAG_IMPORT_SUCCESS = "Diagram imported successfully."
 MSG_DIAG_IMPORT_ERROR = "Error importing diagram: {}"
 
+def parallel_controller_execution(scheduled_parts):
+    """
+    A custom execution strategy that runs the 'atas' mixer and all PID-based
+    'Control_Element' parts in separate threads, while executing any other
+    parts sequentially. This parallelizes the main computational load of the
+    controller.
+    """
+    parallelizable_parts = []
+    sequential_parts = []
+    threads = []
+
+    # Separate the parts that can be run in parallel from the others
+    for part in scheduled_parts:
+        part_id = part.get_identifier()
+        if part_id == 'atas' or 'control_element' in part_id:
+            parallelizable_parts.append(part)
+        else:
+            sequential_parts.append(part)
+
+    # Start each parallelizable part in its own thread
+    for part in parallelizable_parts:
+        thread = threading.Thread(target=part.execute, name=f"{part.get_full_identifier()}_thread")
+        thread.start()
+        threads.append(thread)
+
+    # Execute the rest of the parts sequentially in the main thread
+    sequential_execution(sequential_parts)
+
+    # Wait for all parallel threads to finish before the strategy returns
+    for thread in threads:
+        thread.join()
+
+def parallel_toplevel_execution(scheduled_parts):
+    """
+    A custom execution strategy that runs the main 'simulator' and 'multirotor'
+    parts in parallel threads, as they are the main computational loads and
+    are independent within a single step. Any other parts are run sequentially.
+    """
+    parallelizable_parts = []
+    sequential_parts = []
+    threads = []
+
+    # Separate the parts that can be run in parallel
+    for part in scheduled_parts:
+        part_id = part.get_identifier()
+        if part_id in ['simulator', 'multirotor']:
+            parallelizable_parts.append(part)
+        else:
+            sequential_parts.append(part)
+
+    for part in parallelizable_parts:
+        thread = threading.Thread(target=part.execute, name=f"{part.get_full_identifier()}_thread")
+        thread.start()
+        threads.append(thread)
+
+    sequential_execution(sequential_parts)
+
+    for thread in threads:
+        thread.join()
+
 def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SET_SPEED=None, POSITION_GRAPH_BOUNDARIES=None, SPEED_GRAPH_BOUNDARIES=None, PLOT=None, GUI=None):
 
     conf.INITIAL_POSITION = INITIAL_POSITION
@@ -85,7 +146,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
             error_file=ERROR_FILENAME
         )
 
-        top = Top('top', execution_strategy=sequential_execution)
+        top = Top('top', execution_strategy=parallel_toplevel_execution, controller_execution_strategy=parallel_controller_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
