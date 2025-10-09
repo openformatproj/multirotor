@@ -30,7 +30,7 @@ PLOTTER_ID = 'plotter'
 MOTOR_ID_TPL = 'motor_{}'
 PROPELLER_ID_TPL = 'propeller_{}'
 SIMULATOR_ID = 'simulator'
-MULTIROT_ID = 'multirotor'
+MULTIROTOR_ID = 'multirotor'
 TIME_DIST_ID = 'time_dist'
 
 # --- Port Identifiers ---
@@ -54,12 +54,12 @@ ANGULAR_SPEED_PORT_TPL = 'angular_speed_{}'
 ANGULAR_SPEED_IN_PORT = 'angular_speed_in'
 ANGULAR_SPEED_OUT_PORT = 'angular_speed_out'
 REACTION_TORQUE_PORT = 'reaction_torque'
-MULTIROT_POSITION_PORT = 'multirotor_position'
-MULTIROT_ORIENTATION_PORT = 'multirotor_orientation'
-MULTIROT_LINEAR_SPEED_PORT = 'multirotor_linear_speed'
-MULTIROT_ANGULAR_SPEED_PORT = 'multirotor_angular_speed'
-MULTIROT_THRUST_PORT_TPL = 'multirotor_thrust_{}'
-MULTIROT_TORQUE_PORT_TPL = 'multirotor_torque_{}'
+MULTIROTOR_POSITION_PORT = 'multirotor_position'
+MULTIROTOR_ORIENTATION_PORT = 'multirotor_orientation'
+MULTIROTOR_LINEAR_SPEED_PORT = 'multirotor_linear_speed'
+MULTIROTOR_ANGULAR_SPEED_PORT = 'multirotor_angular_speed'
+MULTIROTOR_THRUST_PORT_TPL = 'multirotor_thrust_{}'
+MULTIROTOR_TORQUE_PORT_TPL = 'multirotor_torque_{}'
 TIME_OUT_PORT = 'time_out'
 TIME_EVENT_IN_Q = 'time_event_in'
 
@@ -227,11 +227,11 @@ class Rigid_Body_Simulator(Part):
 
         # After stepping, read the new state and set the output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
-        self.get_port(MULTIROT_POSITION_PORT).set(position)
-        self.get_port(MULTIROT_ORIENTATION_PORT).set(orientation)
+        self.get_port(MULTIROTOR_POSITION_PORT).set(position)
+        self.get_port(MULTIROTOR_ORIENTATION_PORT).set(orientation)
         linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
-        self.get_port(MULTIROT_LINEAR_SPEED_PORT).set(linear_speed)
-        self.get_port(MULTIROT_ANGULAR_SPEED_PORT).set(angular_speed)
+        self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
+        self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
 
     def __init__(self, identifier: str):
         """
@@ -242,19 +242,19 @@ class Rigid_Body_Simulator(Part):
         """
         ports = [
             Port(TIME_PORT, Port.IN),
-            Port(MULTIROT_POSITION_PORT, Port.OUT),
-            Port(MULTIROT_ORIENTATION_PORT, Port.OUT),
-            Port(MULTIROT_LINEAR_SPEED_PORT, Port.OUT),
-            Port(MULTIROT_ANGULAR_SPEED_PORT, Port.OUT)
+            Port(MULTIROTOR_POSITION_PORT, Port.OUT),
+            Port(MULTIROTOR_ORIENTATION_PORT, Port.OUT),
+            Port(MULTIROTOR_LINEAR_SPEED_PORT, Port.OUT),
+            Port(MULTIROTOR_ANGULAR_SPEED_PORT, Port.OUT)
         ]
         for i in PROPELLERS_INDEXES:
-            ports.append(Port(MULTIROT_THRUST_PORT_TPL.format(i), Port.IN))
-            ports.append(Port(MULTIROT_TORQUE_PORT_TPL.format(i), Port.IN))
+            ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
+            ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
         super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
         self.engine = None
         self.multirotor_avatar = None
-        self.thrust_ports = [self.get_port(MULTIROT_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
-        self.torque_ports = [self.get_port(MULTIROT_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
 
 
 class Top(Part):
@@ -326,7 +326,7 @@ class Top(Part):
                 output_port_id=TIME_OUT_PORT
             ),
             SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID),
-            MULTIROT_ID: Multirotor(MULTIROT_ID, execution_strategy=controller_execution_strategy)
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, execution_strategy=controller_execution_strategy)
         }
         super().__init__(
             identifier=identifier,
@@ -338,7 +338,7 @@ class Top(Part):
         
         time_dist = self.get_part(TIME_DIST_ID)
         simulator = self.get_part(SIMULATOR_ID)
-        multirotor = self.get_part(MULTIROT_ID)
+        multirotor = self.get_part(MULTIROTOR_ID)
 
         self.connect_event_queue(self.get_event_queue(TIME_EVENT_IN_Q), time_dist.get_event_queue(TIME_EVENT_IN_Q))
         
@@ -346,12 +346,12 @@ class Top(Part):
         self.connect(time_out_port, simulator.get_port(TIME_PORT))
         self.connect(time_out_port, multirotor.get_port(TIME_PORT))
         
-        self.connect(simulator.get_port(MULTIROT_POSITION_PORT), multirotor.get_port(POSITION_PORT))
-        self.connect(simulator.get_port(MULTIROT_ORIENTATION_PORT), multirotor.get_port(ORIENTATION_PORT))
-        self.connect(simulator.get_port(MULTIROT_LINEAR_SPEED_PORT), multirotor.get_port(LINEAR_SPEED_PORT))
-        self.connect(simulator.get_port(MULTIROT_ANGULAR_SPEED_PORT), multirotor.get_port(ANGULAR_SPEED_PORT))
+        self.connect(simulator.get_port(MULTIROTOR_POSITION_PORT), multirotor.get_port(POSITION_PORT))
+        self.connect(simulator.get_port(MULTIROTOR_ORIENTATION_PORT), multirotor.get_port(ORIENTATION_PORT))
+        self.connect(simulator.get_port(MULTIROTOR_LINEAR_SPEED_PORT), multirotor.get_port(LINEAR_SPEED_PORT))
+        self.connect(simulator.get_port(MULTIROTOR_ANGULAR_SPEED_PORT), multirotor.get_port(ANGULAR_SPEED_PORT))
         for i in PROPELLERS_INDEXES:
-            self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROT_THRUST_PORT_TPL.format(i)))
-            self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROT_TORQUE_PORT_TPL.format(i)))
+            self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)))
+            self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)))
         self.add_hook('init', self._init_pybullet)
         self.add_hook('term', self._term_pybullet)
