@@ -214,16 +214,12 @@ class Rigid_Body_Simulator(Part):
                 # The link index `i` from enumerate is 0-based, which matches PyBullet's link indexing.
                 self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
                 self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
-
-        try:
-            # The call to stepSimulation should be unconditional to ensure the
-            # physics world always advances in time, preventing instability.
-            self.engine.stepSimulation()
-        except self.engine.error as e:
-            # Re-raise the specific PyBullet error as a more general RuntimeError.
-            # This makes it more likely that the simulation framework will catch it
-            # and trigger a clean shutdown, even in fire_and_forget mode.
-            raise RuntimeError(ERR_PYBULLET_STEP_FAILED) from e
+            
+            # Only step the simulation after new forces have been applied.
+            try:
+                self.engine.stepSimulation()
+            except self.engine.error as e:
+                raise RuntimeError(ERR_PYBULLET_STEP_FAILED) from e
 
         # After stepping, read the new state and set the output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
