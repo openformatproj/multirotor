@@ -12,7 +12,7 @@ import time
 import multiprocessing
 from functools import partial
 from PyQt5.QtWidgets import QApplication
-from ml.strategies import sequential_execution
+from ml.strategies import sequential_execution, execute
 from ml.event_sources import Timer
 from ml.tracer import Tracer
 from ml.enums import OnFullBehavior, LogLevel
@@ -52,8 +52,7 @@ MSG_DIAG_FILE_NOT_FOUND = "Error: JSON file '{}' not found. Please run with 'exp
 MSG_DIAG_LOADING = "Loading diagram from '{}'..."
 MSG_DIAG_IMPORT_SUCCESS = "Diagram imported successfully."
 MSG_DIAG_IMPORT_ERROR = "Error importing diagram: {}"
-
-def parallel_controller_execution(scheduled_parts):
+def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
     """
     A custom execution strategy that runs the 'atas' mixer and all PID-based
     'Control_Element' parts in separate threads, while executing any other
@@ -72,20 +71,24 @@ def parallel_controller_execution(scheduled_parts):
         else:
             sequential_parts.append(part)
 
+    creator_thread_name = threading.current_thread().name
+
     # Start each parallelizable part in its own thread
     for part in parallelizable_parts:
-        thread = threading.Thread(target=part.execute, name=f"{part.get_full_identifier()}_thread")
+        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event), name=f"{part.get_full_identifier()}_thread")
         thread.start()
         threads.append(thread)
 
-    # Execute the rest of the parts sequentially in the main thread
-    sequential_execution(sequential_parts)
+    # Execute the rest of the parts sequentially in the main thread while parallel threads run
+    if sequential_parts:
+        sequential_execution(parent_part, sequential_parts, strategy_event)
 
     # Wait for all parallel threads to finish before the strategy returns
     for thread in threads:
         thread.join()
 
-def parallel_toplevel_execution(scheduled_parts):
+
+def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
     """
     A custom execution strategy that runs the main 'simulator' and 'multirotor'
     parts in parallel threads, as they are the main computational loads and
@@ -103,12 +106,16 @@ def parallel_toplevel_execution(scheduled_parts):
         else:
             sequential_parts.append(part)
 
+    creator_thread_name = threading.current_thread().name
+
     for part in parallelizable_parts:
-        thread = threading.Thread(target=part.execute, name=f"{part.get_full_identifier()}_thread")
+        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event), name=f"{part.get_full_identifier()}_thread")
         thread.start()
         threads.append(thread)
 
-    sequential_execution(sequential_parts)
+    # Execute sequential parts (if any) in the main thread while parallel threads run
+    if sequential_parts:
+        sequential_execution(parent_part, sequential_parts, strategy_event)
 
     for thread in threads:
         thread.join()
