@@ -24,9 +24,9 @@ from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
 
-TRACE_FILENAME = "outs/multirotor_trace.log"
-ERROR_FILENAME = "outs/multirotor_errors.log"
-STRUCTURE_FILENAME = "outs/multirotor_structure.json"
+TRACE_FILENAME = "logs/multirotor_trace.log"
+ERROR_FILENAME = "logs/multirotor_errors.log"
+STRUCTURE_FILENAME = "logs/multirotor_structure.json"
 
 # --- Log constants ---
 MAIN_COMPONENT_ID = "MAIN"
@@ -146,7 +146,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
 
         # Start the tracer
         Tracer.start(
-            level=LogLevel.DEBUG,
+            level=LogLevel.TRACE,
             flush_interval_seconds=5.0,
             output_file=TRACE_FILENAME,
             log_to_console=True,
