@@ -5,8 +5,6 @@ import pybullet
 from decimal import getcontext
 import os
 import sys
-from ml.tracer import Tracer
-from ml.enums import LogLevel
 
 sys.path.append(os.path.dirname(__file__))
 import conf
@@ -202,8 +200,6 @@ class Rigid_Body_Simulator(Part):
             # If the physics engine is not connected, we cannot proceed.
             # Raise an exception to stop the simulation thread gracefully.
             raise RuntimeError(ERR_PYBULLET_NOT_CONNECTED)
-
-        Tracer.log(LogLevel.DEBUG, self.get_identifier(), LOG_EVENT_STEP, {LOG_DETAIL_KEY_CONNECTED: self.engine.isConnected()})
 
         # Check if motor inputs are ready and apply forces if they are.
         # This uses the control inputs calculated in the previous simulation step.
