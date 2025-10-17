@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from PyQt5.QtWidgets import QApplication
+import signal
 from PyQt5.QtCore import QTimer
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -137,6 +138,9 @@ class RealTimePlotter:
         self.fig.canvas.flush_events()
 
 def main(position_bounds=None, speed_bounds=None):
+    # Ignore SIGINT in the child process. The parent process will handle shutdown.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     print(MSG_SERVER_STARTING)
     # Use provided bounds or fall back to defaults
     if position_bounds is None:
