@@ -2,6 +2,7 @@ from decimal import Decimal
 from ml.engine import Part, Port
 from ml.strategies import sequential_execution
 from ml.parts import Operator
+from ml import conf as ml_conf
 from constants import X, Y, Z
 
 class Trajectory_Planner(Part):
@@ -75,26 +76,26 @@ class Trajectory_Planner(Part):
             sum_op = self.get_part(f'{i.name()}_sum_op')
 
             # The time signal drives the target generators
-            self.connect(time_port, set_pos_op.get_port('in_0'))
-            self.connect(time_port, set_speed_op.get_port('in_0'))
+            self.connect(time_port, set_pos_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
+            self.connect(time_port, set_speed_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
 
             # Wire the main data path for the P-controller
             # Error = Target Position - Measured Position
-            self.connect(set_pos_op.get_port('out'), error_op.get_port('in_0'))
-            self.connect(self.get_port(i.name()), error_op.get_port('in_1'))
+            self.connect(set_pos_op.get_port(ml_conf.OPERATOR_OUT_PORT), error_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
+            self.connect(self.get_port(i.name()), error_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(1)))
 
             # P-Term = Kp * Error
-            self.connect(error_op.get_port('out'), p_term_op.get_port('in_0'))
+            self.connect(error_op.get_port(ml_conf.OPERATOR_OUT_PORT), p_term_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
 
             # Final Speed = P-Term + Feed-Forward Speed
-            self.connect(p_term_op.get_port('out'), sum_op.get_port('in_0'))
-            self.connect(set_speed_op.get_port('out'), sum_op.get_port('in_1'))
+            self.connect(p_term_op.get_port(ml_conf.OPERATOR_OUT_PORT), sum_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
+            self.connect(set_speed_op.get_port(ml_conf.OPERATOR_OUT_PORT), sum_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(1)))
 
             # Connect final output to the part's corresponding output port
-            self.connect(sum_op.get_port('out'), self.get_port(f'{i.name()}_speed'))
+            self.connect(sum_op.get_port(ml_conf.OPERATOR_OUT_PORT), self.get_port(f'{i.name()}_speed'))
 
         # Wire the yaw logic
         yaw_op = self.get_part('yaw_speed_op')
         # Use the yaw input port as a trigger to generate the 0.0 output each cycle
-        self.connect(self.get_port('yaw'), yaw_op.get_port('in_0'))
-        self.connect(yaw_op.get_port('out'), self.get_port('yaw_speed'))
+        self.connect(self.get_port('yaw'), yaw_op.get_port(ml_conf.OPERATOR_IN_PORT_TPL.format(0)))
+        self.connect(yaw_op.get_port(ml_conf.OPERATOR_OUT_PORT), self.get_port('yaw_speed'))

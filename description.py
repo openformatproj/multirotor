@@ -6,6 +6,8 @@ from decimal import getcontext
 import os
 import sys
 
+from ml import conf as ml_conf
+
 sys.path.append(os.path.dirname(__file__))
 import conf
 from services import generate_urdf_model
@@ -345,5 +347,5 @@ class Top(Part):
         for i in PROPELLERS_INDEXES:
             self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)))
             self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)))
-        self.add_hook('init', self._init_pybullet)
-        self.add_hook('term', self._term_pybullet)
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, self._init_pybullet)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, self._term_pybullet)
