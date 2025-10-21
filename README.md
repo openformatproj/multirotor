@@ -82,7 +82,7 @@ Here's a snippet of how the environment is built at the code level (`src/descrip
 from ml.engine import Part, Port, EventQueue
 from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
-import conf
+from ml import conf as ml_conf
 from propeller.description import Propeller
 from motor.description import Motor
 from sensors.description import Sensors
@@ -126,22 +126,22 @@ class Multirotor(Part):
 class Rigid_Body_Simulator(Part):
     def behavior(self):
         if not self.engine or not self.engine.isConnected():
-            raise RuntimeError("PyBullet physics engine is not connected.")
+            raise RuntimeError(ERR_PYBULLET_NOT_CONNECTED)
 
         # Apply forces from the previous control cycle if inputs are ready.
         if all(p.is_updated() for p in self.thrust_ports) and all(p.is_updated() for p in self.torque_ports):
             for i, (thrust_port, torque_port) in enumerate(zip(self.thrust_ports, self.torque_ports)):
                 thrust = thrust_port.get()
                 torque = torque_port.get()
-                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
-                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
+                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME) # type: ignore
+                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME) # type: ignore
 
         try:
             # The call to stepSimulation is unconditional to ensure the physics world
             # always advances in time, preventing instability.
             self.engine.stepSimulation()
         except self.engine.error as e:
-            raise RuntimeError("PyBullet simulation step failed.") from e
+            raise RuntimeError(ERR_PYBULLET_STEP_FAILED) from e
 
         # Read the new state and set output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
@@ -165,7 +165,7 @@ class Rigid_Body_Simulator(Part):
         super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port('time').is_updated())
 
 class Top(Part):
-    def __init__(self, identifier: str, execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
         event_queues = [EventQueue('time_event_in', EventQueue.IN, size=1)]
         parts = {
             'time_dist': EventToDataSynchronizer(
@@ -174,7 +174,7 @@ class Top(Part):
                 output_port_id='time_out'
             ),
             'simulator': Rigid_Body_Simulator('simulator'),
-            'multirotor': Multirotor('multirotor')
+            'multirotor': Multirotor('multirotor', execution_strategy=controller_execution_strategy)
         }
         super().__init__(identifier=identifier, execution_strategy=execution_strategy, parts=parts, event_queues=event_queues)
         
@@ -195,9 +195,8 @@ class Top(Part):
         for i in PROPELLERS_INDEXES:
             self.connect(multirotor.get_port(f'thrust_{i}'), simulator.get_port(f'multirotor_thrust_{i}'))
             self.connect(multirotor.get_port(f'torque_{i}'), simulator.get_port(f'multirotor_torque_{i}'))
-
-        self.add_hook('init', self._init_pybullet)
-        self.add_hook('term', self._term_pybullet)
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, self._init_pybullet)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, self._term_pybullet)
 ```
 
 As it's possible to understand, `class Multirotor` defines its ports, the parts it's composed of (motors, propellers, sensors, the trajectory_planner and the controller) and their connections. All these parts are further defined in their specific subfolders, such as `./motor`, `./propeller`, and so on. This kind of description is called *structural* and allows building hierarchies. `class Rigid_Body_Simulator` provides instead an example of *behavioral* description:
