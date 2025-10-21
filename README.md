@@ -205,7 +205,7 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 * When, moreover, thrusts and torques are updated by the multirotor model, they are applied to the avatar and the simulation engine is stepped
 
 `class Top` finally aggregates the simulator, the multirotor model and a timer whose role is updating the time with a specific periodicity. This allows to run a "real time" simulation, provided that all computations are able to terminate within that period. To perform the simulation one can simply instantiate that class and run the timer:
-`class Top` finally aggregates the simulator and the multirotor model. It is driven by an external `Timer` (an `EventSource`) that provides time events. This allows running a "real time" simulation, provided that all computations are able to terminate within the timer's period. To perform the simulation, one can instantiate these components and run them in separate threads:
+`class Top` finally aggregates the simulator and the multirotor model. It is driven by an external `Timer` (an `EventSource`) that provides time events. This allows running a "real time" simulation, provided that all computations are able to terminate within the timer's period. To perform the simulation, one can instantiate these components and run them in separate threads.
 The `Timer`'s `on_full` policy is critical. Using `OnFullBehavior.FAIL` (as shown below) enforces strict real-time execution by stopping the simulation if a deadline is missed. This is the recommended mode for validating system performance. The alternative, `OnFullBehavior.OVERWRITE`, allows the simulation to continue by dropping events, which can be useful for non-critical analysis.
 
 ```python
