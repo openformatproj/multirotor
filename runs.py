@@ -277,7 +277,7 @@ def analyze_trace(args=None):
         return
 
     parser = argparse.ArgumentParser(description="Analyze the multirotor trace log.")
-    parser.add_argument("--format", choices=['text', 'json'], default='text', help="Output format (default: text).")
+    parser.add_argument("--format", choices=['text', 'json', 'json:perfetto'], default='text', help="Output format (default: text).")
     parser.add_argument("-o", "--output", help="Path to the output file. If not provided, prints to stdout.")
 
     # If no args are passed from run.py, parse_args will use sys.argv, which is not what we want.
