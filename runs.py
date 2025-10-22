@@ -133,6 +133,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
     conf.GUI = GUI
 
     plot_server_process = None
+    top = None
     try:
         if conf.PLOT:
             print(MSG_PLOT_SERVER_STARTING)
@@ -192,7 +193,8 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         if 'timer' in locals() and timer:
             timer.stop()
             timer.wait()
-        if 'top' in locals() and top: # top.wait() is implicitly handled by the loop exit
+        if top: # top.wait() is implicitly handled by the loop exit
+            # Terminate hooks (e.g., disconnect pybullet)
             top.term()
 
         # 2. Terminate the plot server process if it's still running.
