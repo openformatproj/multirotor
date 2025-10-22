@@ -76,7 +76,7 @@ def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
 
     # Start each parallelizable part in its own thread
     for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event), name=f"{part.get_full_identifier()}_thread")
+        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
         thread.start()
         threads.append(thread)
 
@@ -110,7 +110,7 @@ def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
     creator_thread_name = threading.current_thread().name
 
     for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event), name=f"{part.get_full_identifier()}_thread")
+        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
         thread.start()
         threads.append(thread)
 
