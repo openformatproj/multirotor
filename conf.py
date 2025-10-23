@@ -1,4 +1,5 @@
 import os
+from math import cos, sin
 
 TIME_STEP = 1./120. # Default physics time step in seconds (240 Hz)
 
@@ -22,11 +23,20 @@ REAL_TIME_SIMULATION = False
 # Decimation factor for plotting. A value of N means 1 out of every N data points will be plotted.
 PLOT_DECIMATION = 100
 
-INITIAL_POSITION = None
-INITIAL_ROTATION = None
-SET_POSITION = None
-SET_SPEED = None
-POSITION_GRAPH_BOUNDARIES = None
-SPEED_GRAPH_BOUNDARIES = None
-PLOT = None
-GUI = None
+# --- Default Simulation Parameters ---
+INITIAL_POSITION = [1, 0, 1]
+INITIAL_ROTATION = [0, 0, 0]
+
+# Default trajectory functions
+w = 0.5  # angular speed of the xy trajectory in rad/s
+q = 1.0  # angular speed of the z trajectory in rad/s
+a = 0.7  # amplitude of the z trajectory in rad/s
+graph_margin = 1.5
+
+SET_POSITION = lambda t: [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
+SET_SPEED = lambda t: [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
+POSITION_GRAPH_BOUNDARIES = [(-1 * graph_margin, 1 * graph_margin), (-1 * graph_margin, 1 * graph_margin), ((1 - a * graph_margin), (1 + a * graph_margin))]
+SPEED_GRAPH_BOUNDARIES = [(-w * graph_margin, w * graph_margin), (-w * graph_margin, w * graph_margin), (-a * q * graph_margin, a * q * graph_margin)]
+
+GUI = False
+PLOT = True

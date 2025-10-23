@@ -25,6 +25,14 @@ from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
 
+class Configuration:
+    """A simple object to hold and pass simulation configuration."""
+    def __init__(self):
+        # Load all variables from the conf module into this object
+        for key, value in vars(conf).items():
+            if not key.startswith('__'):
+                setattr(self, key, value)
+
 # --- Log constants ---
 MAIN_COMPONENT_ID = "MAIN"
 LOG_EVENT_START = "START"
@@ -117,25 +125,19 @@ def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
     for thread in threads:
         thread.join()
 
-def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SET_SPEED=None, POSITION_GRAPH_BOUNDARIES=None, SPEED_GRAPH_BOUNDARIES=None, PLOT=None, GUI=None, trace_filename=None, error_filename=None):
+def simulate(trace_filename=None, error_filename=None):
 
-    conf.INITIAL_POSITION = INITIAL_POSITION
-    conf.INITIAL_ROTATION = INITIAL_ROTATION
-    conf.SET_POSITION = SET_POSITION
-    conf.SET_SPEED = SET_SPEED
-    conf.POSITION_GRAPH_BOUNDARIES = POSITION_GRAPH_BOUNDARIES
-    conf.SPEED_GRAPH_BOUNDARIES = SPEED_GRAPH_BOUNDARIES
-    conf.PLOT = PLOT
-    conf.GUI = GUI
+    # Create a configuration object that holds all parameters.
+    sim_conf = Configuration()
 
     plot_server_process = None
     top = None
     try:
-        if conf.PLOT:
+        if sim_conf.PLOT:
             print(MSG_PLOT_SERVER_STARTING)
             plot_server_process = multiprocessing.Process(
                 target=run_plot_server,
-                args=(conf.POSITION_GRAPH_BOUNDARIES, conf.SPEED_GRAPH_BOUNDARIES)
+                args=(sim_conf.POSITION_GRAPH_BOUNDARIES, sim_conf.SPEED_GRAPH_BOUNDARIES)
             )
             plot_server_process.daemon = True  # Ensure the process exits with the main script
             plot_server_process.start()
@@ -151,7 +153,7 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
             error_file=error_filename
         )
 
-        top = Top('top', execution_strategy=parallel_toplevel_execution, controller_execution_strategy=parallel_controller_execution)
+        top = Top('top', conf=sim_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -162,8 +164,8 @@ def simulate(INITIAL_POSITION=None, INITIAL_ROTATION=None, SET_POSITION=None, SE
         # with the timer, which is crucial for exposing performance bottlenecks.
         # In non-real-time mode (`DROP`), it drops events to keep running,
         # which can be useful for non-critical runs or debugging.
-        on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-        timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior)
+        on_full_behavior = OnFullBehavior.FAIL if sim_conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
+        timer = Timer(identifier='physics_timer', interval_seconds=sim_conf.TIME_STEP, on_full=on_full_behavior)
 
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')

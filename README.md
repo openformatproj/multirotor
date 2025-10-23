@@ -54,7 +54,7 @@ This script builds the multirotor architecture, initializes it and starts the si
 ![Figure 2: Multirotor simulation - Position plot](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
 <p align="center">Figure 2: Multirotor simulation - Position plot (matplotlib)</p>
 
-By default, `run.py` configures the multirotor to follow a circular trajectory around the origin:
+By default, `src/conf.py` configures the multirotor to follow a circular trajectory around the origin:
 
 ```python
 SET_POSITION = lambda t : [cos(w*t), sin(w*t), 1 + a*sin(q*t)]
@@ -79,10 +79,10 @@ The idea in this case is to define the behavior of bottom-level components (moto
 Here's a snippet of how the environment is built at the code level (`src/description.py`):
 
 ```python
-# Import dependencies and define constants
+# Import dependencies
 
 class Multirotor(Part):
-    def __init__(self, identifier: str, execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution):
         ports = [
             Port(TIME_PORT, Port.IN),
             Port(POSITION_PORT, Port.IN),
@@ -92,8 +92,8 @@ class Multirotor(Part):
         ]
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
-            TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf.SET_POSITION, conf.SET_SPEED),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, execution_strategy=execution_strategy)
+            TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
+            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=execution_strategy)
         }
         for i in PROPELLERS_INDEXES:
             ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
@@ -106,7 +106,8 @@ class Multirotor(Part):
             identifier=identifier,
             execution_strategy=sequential_execution,
             ports=ports,
-            parts=parts
+            parts=parts,
+            conf=conf
         )
         
         # Connect time, position, orientation, etc. to inner parts
@@ -131,7 +132,7 @@ class Rigid_Body_Simulator(Part):
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, conf: object):
         ports = [
             Port(TIME_PORT, Port.IN),
             Port(MULTIROTOR_POSITION_PORT, Port.OUT),
@@ -142,7 +143,7 @@ class Rigid_Body_Simulator(Part):
         for i in PROPELLERS_INDEXES:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
-        super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
+        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
         self.engine = None
         self.multirotor_avatar = None
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
@@ -151,7 +152,7 @@ class Rigid_Body_Simulator(Part):
 class Top(Part):
     # Define an initialization hook that connects to the PyBullet physics engine and a termination hook to disconnect
 
-    def __init__(self, identifier: str, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
         self.engine = None
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
@@ -160,16 +161,16 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID),
+            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, execution_strategy=controller_execution_strategy)
         }
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,
             parts=parts,
-            event_queues=event_queues
+            event_queues=event_queues,
+            conf=conf
         )
-        getcontext().prec = conf.DECIMAL_CONTEXT_PRECISION
         
         time_dist = self.get_part(TIME_DIST_ID)
         simulator = self.get_part(SIMULATOR_ID)

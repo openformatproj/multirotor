@@ -2,14 +2,12 @@ from ml.engine import Part, Port, EventQueue
 from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
 import pybullet
-from decimal import getcontext
 import os
 import sys
 
 from ml import conf as ml_conf
 
 sys.path.append(os.path.dirname(__file__))
-import conf
 from services import generate_urdf_model
 from world.services import generate_world
 from propeller.description import Propeller
@@ -20,7 +18,7 @@ from controller.description import Controller
 from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
 
-PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
+PROPELLERS_INDEXES = None # Will be initialized in Top
 
 # --- Component Identifiers ---
 SENSORS_ID = 'sensors'
@@ -86,12 +84,13 @@ class Multirotor(Part):
     actuator outputs (thrust and torque) back to it.
     """
 
-    def __init__(self, identifier: str, execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution):
         """
         Initializes the Multirotor structural part.
 
         Args:
             identifier (str): The unique name for this part.
+            conf (object): The simulation configuration object.
             execution_strategy: The execution strategy for the controller.
         """
         ports = [
@@ -103,8 +102,8 @@ class Multirotor(Part):
         ]
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
-            TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf.SET_POSITION, conf.SET_SPEED),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, execution_strategy=execution_strategy)
+            TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
+            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=execution_strategy)
         }
         if conf.PLOT:
             parts[PLOTTER_ID] = XYZ_Monitor(
@@ -123,7 +122,8 @@ class Multirotor(Part):
             identifier=identifier,
             execution_strategy=sequential_execution,
             ports=ports,
-            parts=parts
+            parts=parts,
+            conf=conf
         )
         
         self.connect(self.get_port(TIME_PORT), self.get_part(SENSORS_ID).get_port(TIME_PORT))
@@ -178,16 +178,16 @@ class Rigid_Body_Simulator(Part):
         """
         self.engine = engine
         generate_world(self.engine)
-        if conf.UPDATE_URDF_MODEL:
-            generate_urdf_model(conf.BASE_DIRECTORY, conf.URDF_MODEL, conf.URDF_TEMPLATE, conf.FRAME_MASS, conf.FRAME_SIZE, conf.PROPELLERS, conf.MAIN_RADIUS)
+        if self.conf.UPDATE_URDF_MODEL:
+            generate_urdf_model(self.conf.BASE_DIRECTORY, self.conf.URDF_MODEL, self.conf.URDF_TEMPLATE, self.conf.FRAME_MASS, self.conf.FRAME_SIZE, self.conf.PROPELLERS, self.conf.MAIN_RADIUS)
         
-        if not os.path.exists(conf.URDF_MODEL):
-            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(conf.URDF_MODEL))
+        if not os.path.exists(self.conf.URDF_MODEL):
+            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(self.conf.URDF_MODEL))
 
         try:
-            self.multirotor_avatar = self.engine.loadURDF(conf.URDF_MODEL, conf.INITIAL_POSITION, self.engine.getQuaternionFromEuler(conf.INITIAL_ROTATION))
+            self.multirotor_avatar = self.engine.loadURDF(self.conf.URDF_MODEL, self.conf.INITIAL_POSITION, self.engine.getQuaternionFromEuler(self.conf.INITIAL_ROTATION)) # type: ignore
         except self.engine.error as e:
-            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(conf.URDF_MODEL, e))
+            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(self.conf.URDF_MODEL, e))
 
     def behavior(self):
         """
@@ -227,12 +227,13 @@ class Rigid_Body_Simulator(Part):
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Rigid_Body_Simulator behavioral part.
 
         Args:
             identifier (str): The unique name for this part.
+            conf (object): The simulation configuration object.
         """
         ports = [
             Port(TIME_PORT, Port.IN),
@@ -244,7 +245,7 @@ class Rigid_Body_Simulator(Part):
         for i in PROPELLERS_INDEXES:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
-        super().__init__(identifier=identifier, ports=ports, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
+        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
         self.engine = None
         self.multirotor_avatar = None
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
@@ -270,8 +271,8 @@ class Top(Part):
         """
         self.engine = pybullet
         # Use DIRECT for headless simulation, GUI for visualization.
-        mode_str = 'GUI' if conf.GUI else 'DIRECT'
-        connection_mode = self.engine.GUI if conf.GUI else self.engine.DIRECT
+        mode_str = 'GUI' if self.conf.GUI else 'DIRECT'
+        connection_mode = self.engine.GUI if self.conf.GUI else self.engine.DIRECT
         try:
             # Connect to the physics engine. This can fail if GUI is requested
             # but no graphical environment is available.
@@ -287,8 +288,8 @@ class Top(Part):
             raise RuntimeError(ERR_PYBULLET_CONNECT_NO_EXCEPTION)
 
         # Configure the physics engine. This is critical for stability.
-        self.engine.setGravity(0, 0, conf.G)
-        self.engine.setTimeStep(conf.TIME_STEP)
+        self.engine.setGravity(0, 0, self.conf.G)
+        self.engine.setTimeStep(self.conf.TIME_STEP)
         self.engine.setRealTimeSimulation(0) # We are driving the simulation manually
 
         self.get_part(SIMULATOR_ID)._set_engine(self.engine)
@@ -301,7 +302,7 @@ class Top(Part):
         if self.engine and self.engine.isConnected():
             self.engine.disconnect()
 
-    def __init__(self, identifier: str, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
         """
         Initializes the Top structural part.
 
@@ -311,6 +312,9 @@ class Top(Part):
             controller_execution_strategy: The execution strategy for the controller,
                                            passed down to the Multirotor part.
         """
+        global PROPELLERS_INDEXES
+        PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
+
         self.engine = None
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
@@ -319,16 +323,16 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID),
-            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, execution_strategy=controller_execution_strategy)
+            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf, execution_strategy=controller_execution_strategy)
         }
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,
             parts=parts,
-            event_queues=event_queues
+            event_queues=event_queues,
+            conf=conf
         )
-        getcontext().prec = conf.DECIMAL_CONTEXT_PRECISION
         
         time_dist = self.get_part(TIME_DIST_ID)
         simulator = self.get_part(SIMULATOR_ID)

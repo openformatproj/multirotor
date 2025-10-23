@@ -20,16 +20,13 @@ class Trajectory_Planner(Part):
     KP_HORIZONTAL = Decimal('0.7')
     KP_VERTICAL = Decimal('3.0')
 
-    def __init__(self, identifier, set_position, set_speed):
+    def __init__(self, identifier, conf: object):
         """
         Initializes the Trajectory_Planner structural part.
 
         Args:
             identifier (str): The unique name for this part.
-            set_position (callable): A function that takes time (t) and returns
-                                     a target position vector [x, y, z].
-            set_speed (callable): A function that takes time (t) and returns
-                                  a feed-forward speed vector [vx, vy, vz].
+            conf: The simulation configuration object.
         """
         # Define the external ports for this part
         ports = [
@@ -48,8 +45,8 @@ class Trajectory_Planner(Part):
             kp = self.KP_HORIZONTAL if i in [X, Y] else self.KP_VERTICAL
 
             # Create parts for this axis's control logic
-            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, idx=i.index(): Decimal(set_position(t)[idx]))
-            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, idx=i.index(): Decimal(set_speed(t)[idx]))
+            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, idx=i.index(): Decimal(conf.SET_POSITION(t)[idx]))
+            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, idx=i.index(): Decimal(conf.SET_SPEED(t)[idx]))
             parts[f'{i.name()}_error_op'] = Operator(f'{i.name()}_error_op', 2, lambda target, measure: target - measure)
             parts[f'{i.name()}_p_term_op'] = Operator(f'{i.name()}_p_term_op', 1, lambda error, gain=kp: gain * error)
             parts[f'{i.name()}_sum_op'] = Operator(f'{i.name()}_sum_op', 2, lambda p_term, speed_ff: p_term + speed_ff)
@@ -61,7 +58,8 @@ class Trajectory_Planner(Part):
             identifier=identifier,
             ports=ports,
             parts=parts,
-            execution_strategy=sequential_execution
+            execution_strategy=sequential_execution,
+            conf=conf
         )
 
         # --- Wire the components together ---
