@@ -123,6 +123,7 @@ class Multirotor(Part):
             execution_strategy=sequential_execution,
             ports=ports,
             parts=parts,
+            scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN)),
             conf=conf
         )
         
