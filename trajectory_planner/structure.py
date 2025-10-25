@@ -45,14 +45,20 @@ class Trajectory_Planner(Part):
             kp = self.KP_HORIZONTAL if i in [X, Y] else self.KP_VERTICAL
 
             # Create parts for this axis's control logic
-            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, idx=i.index(): Decimal(conf.SET_POSITION(t)[idx]))
-            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, idx=i.index(): Decimal(conf.SET_SPEED(t)[idx]))
+            # The lambda functions now return floats. The conversion to Decimal happens inside the Operator's
+            # behavior, which runs in the correctly configured thread. By converting from a string, we
+            # ensure the current thread's precision context is used.
+            pos_lambda = lambda t, idx=i.index(): conf.SET_POSITION(t)[idx]
+            speed_lambda = lambda t, idx=i.index(): conf.SET_SPEED(t)[idx]
+
+            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, op=pos_lambda: Decimal(str(op(t))))
+            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, op=speed_lambda: Decimal(str(op(t))))
             parts[f'{i.name()}_error_op'] = Operator(f'{i.name()}_error_op', 2, lambda target, measure: target - measure)
             parts[f'{i.name()}_p_term_op'] = Operator(f'{i.name()}_p_term_op', 1, lambda error, gain=kp: gain * error)
             parts[f'{i.name()}_sum_op'] = Operator(f'{i.name()}_sum_op', 2, lambda p_term, speed_ff: p_term + speed_ff)
 
         # Yaw speed is fixed at 0.0
-        parts['yaw_speed_op'] = Operator('yaw_speed_op', 1, lambda _: Decimal(0.0))
+        parts['yaw_speed_op'] = Operator('yaw_speed_op', 1, lambda _: Decimal('0.0'))
 
         super().__init__(
             identifier=identifier,
