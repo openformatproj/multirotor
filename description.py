@@ -84,14 +84,14 @@ class Multirotor(Part):
     actuator outputs (thrust and torque) back to it.
     """
 
-    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, controller_execution_strategy=sequential_execution):
         """
         Initializes the Multirotor structural part.
 
         Args:
             identifier (str): The unique name for this part.
             conf (object): The simulation configuration object.
-            execution_strategy: The execution strategy for the controller.
+            controller_execution_strategy: The execution strategy for the controller.
         """
         ports = [
             Port(TIME_PORT, Port.IN),
@@ -103,7 +103,7 @@ class Multirotor(Part):
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=execution_strategy)
+            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=controller_execution_strategy)
         }
         if conf.PLOT:
             parts[PLOTTER_ID] = XYZ_Monitor(
@@ -324,7 +324,7 @@ class Top(Part):
                 output_port_id=TIME_OUT_PORT
             ),
             SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
-            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf, execution_strategy=controller_execution_strategy)
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf, controller_execution_strategy=controller_execution_strategy)
         }
         super().__init__(
             identifier=identifier,
