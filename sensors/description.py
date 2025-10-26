@@ -28,14 +28,14 @@ class Sensors(Part):
         linear_speed = self.get_port('linear_speed').get()
         angular_speed = self.get_port('angular_speed').get()
         # IMU (linear acceleration)
-        self.get_port('roll').set(Decimal(roll)) # phi
-        self.get_port('pitch').set(Decimal(pitch)) # theta
+        self.get_port('roll').set(Decimal(str(roll))) # phi
+        self.get_port('pitch').set(Decimal(str(pitch))) # theta
         # compass
-        self.get_port('yaw').set(Decimal(yaw)) # psi
+        self.get_port('yaw').set(Decimal(str(yaw))) # psi
         # IMU (angular speed)
-        self.get_port('roll_speed').set(Decimal(angular_speed[X.index()]))
-        self.get_port('pitch_speed').set(Decimal(angular_speed[Y.index()]))
-        self.get_port('yaw_speed').set(Decimal(angular_speed[Z.index()]))
+        self.get_port('roll_speed').set(Decimal(str(angular_speed[X.index()])))
+        self.get_port('pitch_speed').set(Decimal(str(angular_speed[Y.index()])))
+        self.get_port('yaw_speed').set(Decimal(str(angular_speed[Z.index()])))
         # Ground station
         x = position[X.index()]
         y = position[Y.index()]
@@ -43,13 +43,13 @@ class Sensors(Part):
         x_speed = linear_speed[X.index()]
         y_speed = linear_speed[Y.index()]
         z_speed = linear_speed[Z.index()]
-        self.get_port('x').set(Decimal(x))
-        self.get_port('y').set(Decimal(y))
-        self.get_port('x_speed').set(Decimal(x_speed))
-        self.get_port('y_speed').set(Decimal(y_speed))
+        self.get_port('x').set(Decimal(str(x)))
+        self.get_port('y').set(Decimal(str(y)))
+        self.get_port('x_speed').set(Decimal(str(x_speed)))
+        self.get_port('y_speed').set(Decimal(str(y_speed)))
         # altitude sensors
-        self.get_port('z').set(Decimal(z))
-        self.get_port('z_speed').set(Decimal(z_speed))
+        self.get_port('z').set(Decimal(str(z)))
+        self.get_port('z_speed').set(Decimal(str(z_speed)))
 
     def __init__(self, identifier):
         """
