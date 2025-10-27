@@ -1,6 +1,6 @@
-from decimal import Decimal
 from ml.engine import Part, Port
 from ml.strategies import sequential_execution
+from ml.data import Number
 from ml.parts import Operator
 from ml import conf as ml_conf
 from constants import X, Y, Z
@@ -16,10 +16,6 @@ class Trajectory_Planner(Part):
     `speed_out = Kp * (target_pos - current_pos) + target_speed`
     """
 
-    # Proportional gains for the position controller.
-    KP_HORIZONTAL = Decimal('0.7')
-    KP_VERTICAL = Decimal('3.0')
-
     def __init__(self, identifier, conf: object):
         """
         Initializes the Trajectory_Planner structural part.
@@ -28,6 +24,10 @@ class Trajectory_Planner(Part):
             identifier (str): The unique name for this part.
             conf: The simulation configuration object.
         """
+        # Proportional gains for the position controller.
+        self.KP_HORIZONTAL = Number('0.7')
+        self.KP_VERTICAL = Number('3.0')
+
         # Define the external ports for this part
         ports = [
             Port('time', Port.IN),
@@ -48,17 +48,17 @@ class Trajectory_Planner(Part):
             # The lambda functions now return floats. The conversion to Decimal happens inside the Operator's
             # behavior, which runs in the correctly configured thread. By converting from a string, we
             # ensure the current thread's precision context is used.
-            pos_lambda = lambda t, idx=i.index(): conf.SET_POSITION(t)[idx]
-            speed_lambda = lambda t, idx=i.index(): conf.SET_SPEED(t)[idx]
+            pos_lambda = lambda t, idx=i.index(): conf.SET_POSITION(float(t))[idx]
+            speed_lambda = lambda t, idx=i.index(): conf.SET_SPEED(float(t))[idx]
 
-            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, op=pos_lambda: Decimal(str(op(t))))
-            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, op=speed_lambda: Decimal(str(op(t))))
+            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, op=pos_lambda: Number(op(t)))
+            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, op=speed_lambda: Number(op(t)))
             parts[f'{i.name()}_error_op'] = Operator(f'{i.name()}_error_op', 2, lambda target, measure: target - measure)
             parts[f'{i.name()}_p_term_op'] = Operator(f'{i.name()}_p_term_op', 1, lambda error, gain=kp: gain * error)
             parts[f'{i.name()}_sum_op'] = Operator(f'{i.name()}_sum_op', 2, lambda p_term, speed_ff: p_term + speed_ff)
 
         # Yaw speed is fixed at 0.0
-        parts['yaw_speed_op'] = Operator('yaw_speed_op', 1, lambda _: Decimal('0.0'))
+        parts['yaw_speed_op'] = Operator('yaw_speed_op', 1, lambda _: Number('0.0'))
 
         super().__init__(
             identifier=identifier,

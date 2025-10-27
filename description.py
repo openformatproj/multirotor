@@ -2,6 +2,7 @@ from ml.engine import Part, Port, EventQueue
 from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
 import pybullet
+from ml.data import Number
 import os
 import sys
 
@@ -315,6 +316,9 @@ class Top(Part):
         """
         global PROPELLERS_INDEXES
         PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
+
+        # Configure the Number class globally before any parts are instantiated.
+        Number.configure(conf)
 
         self.engine = None
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]

@@ -1,5 +1,5 @@
-from decimal import Decimal
 from ml.engine import Part, Port
+from ml.data import Number
 from constants import X, Y, Z
 
 class Trajectory_Planner(Part):
@@ -20,10 +20,6 @@ class Trajectory_Planner(Part):
         - `yaw_speed` (OUT): The calculated yaw speed setpoint.
     """
 
-    # Proportional gains for the position controller.
-    KP_HORIZONTAL = Decimal('0.7')
-    KP_VERTICAL = Decimal('3.0')
-
     def behavior(self):
         """
         Calculates the speed setpoints for each axis.
@@ -38,14 +34,15 @@ class Trajectory_Planner(Part):
         z = self.get_port(Z.name()).get()
 
         # Calculate speed for each axis using: Kp * (target_pos - current_pos) + target_speed
-        x_speed_out = self.KP_HORIZONTAL * (Decimal(self.set_position(t)[X.index()]) - x) + Decimal(self.set_speed(t)[X.index()])
-        y_speed_out = self.KP_HORIZONTAL * (Decimal(self.set_position(t)[Y.index()]) - y) + Decimal(self.set_speed(t)[Y.index()])
-        z_speed_out = self.KP_VERTICAL * (Decimal(self.set_position(t)[Z.index()]) - z) + Decimal(self.set_speed(t)[Z.index()])
+        t_float = float(t)
+        x_speed_out = self.KP_HORIZONTAL * (Number(self.set_position(t_float)[X.index()]) - x) + Number(self.set_speed(t_float)[X.index()])
+        y_speed_out = self.KP_HORIZONTAL * (Number(self.set_position(t_float)[Y.index()]) - y) + Number(self.set_speed(t_float)[Y.index()])
+        z_speed_out = self.KP_VERTICAL * (Number(self.set_position(t_float)[Z.index()]) - z) + Number(self.set_speed(t_float)[Z.index()])
 
         self.get_port(f'{X.name()}_speed').set(x_speed_out)
         self.get_port(f'{Y.name()}_speed').set(y_speed_out)
         self.get_port(f'{Z.name()}_speed').set(z_speed_out)
-        self.get_port('yaw_speed').set(Decimal(0.0))
+        self.get_port('yaw_speed').set(Number(0.0))
 
     def __init__(self, identifier, set_position, set_speed):
         """
@@ -58,6 +55,9 @@ class Trajectory_Planner(Part):
             set_speed (callable): A function that takes time (t) and returns
                                   a feed-forward speed vector [vx, vy, vz].
         """
+        # Proportional gains for the position controller.
+        self.KP_HORIZONTAL = Number('0.7')
+        self.KP_VERTICAL = Number('3.0')
         ports = [
             Port('time', Port.IN)
         ]
