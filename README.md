@@ -48,10 +48,10 @@ Once launched, you can execute the `run.py` script from the container:
 
 This script builds the multirotor architecture, initializes it and starts the simulation timer. The execution should produce the following result:
 
-![Figure 1: Multirotor simulation - 3D rendering](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/1.gif)
+![Figure 1: Multirotor simulation - 3D rendering](img/1.gif)
 <p align="center">Figure 1: Multirotor simulation - 3D rendering (PyBullet)</p>
 
-![Figure 2: Multirotor simulation - Position plot](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/2.gif)
+![Figure 2: Multirotor simulation - Position plot](img/2.gif)
 <p align="center">Figure 2: Multirotor simulation - Position plot (matplotlib)</p>
 
 By default, `src/conf.py` configures the multirotor to follow a circular trajectory around the origin:
@@ -71,7 +71,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
 
 <p id="figure-3"/>
 
-![Figure 3: Multirotor model structure](https://raw.githubusercontent.com/openformatproj/multirotor/refs/heads/master/img/3.png)
+![Figure 3: Multirotor model structure](img/3.png)
 <p align="center">Figure 3: Multirotor model structure</p>
 
 <a href="#figure-3">Figure 3</a> shows the high-level structure of the `Multirotor` model (the diagram has been generated with [openformatproj/diagrams](https://github.com/openformatproj/diagrams)). The `Top` component encapsulates the `Multirotor` model and the `Rigid_Body_Simulator`. The entire simulation is driven by an external `Timer` (an `EventSource`), which provides time-tick events to the `Top` part. This event-driven approach ensures that the simulation only executes when a time step is required.
