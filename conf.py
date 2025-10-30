@@ -21,6 +21,7 @@ DECIMAL_CONTEXT_PRECISION = 4 # Only used if NUMBER_IMPLEMENTATION is DECIMAL
 G = -9.81
 
 REAL_TIME_SIMULATION = False
+HIGH_PRIORITY = False
 
 # Decimation factor for plotting. A value of N means 1 out of every N data points will be plotted.
 PLOT_DECIMATION = 100

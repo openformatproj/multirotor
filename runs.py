@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(__file__))
 
 import json
 import gc
+import platform
 import threading
 import time
 import multiprocessing
@@ -126,6 +127,22 @@ def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
     for thread in threads:
         thread.join()
 
+def set_high_priority():
+    """
+    Sets the process priority to high to improve timer accuracy for real-time simulation.
+    This is crucial for reducing OS-level scheduling jitter.
+    """
+    if platform.system() == "Windows":
+        # On Windows, 0x80 is "High Priority".
+        # Note: This requires the 'psutil' library.
+        # You may need to run: pip install psutil
+        import psutil
+        p = psutil.Process(os.getpid())
+        p.nice(psutil.HIGH_PRIORITY_CLASS)
+    else:
+        # On Linux/macOS, a lower nice value means higher priority.
+        os.nice(-10)
+
 def simulate(trace_filename=None, error_filename=None):
 
     # Create a configuration object that holds all parameters.
@@ -177,6 +194,11 @@ def simulate(trace_filename=None, error_filename=None):
         # Disable the garbage collector to prevent unpredictable pauses during
         # the simulation, which can cause jitter and missed deadlines.
         gc.disable()
+
+        # For real-time simulations, increase process priority to minimize
+        # OS scheduler jitter, which can cause timer inaccuracies.
+        if sim_conf.HIGH_PRIORITY:
+            set_high_priority()
         
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
