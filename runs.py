@@ -7,6 +7,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 import json
+import gc
 import threading
 import time
 import multiprocessing
@@ -172,6 +173,11 @@ def simulate(trace_filename=None, error_filename=None):
         top.connect_event_source(timer, 'time_event_in')
 
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_START, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_START.format(datetime.now())})
+        
+        # Disable the garbage collector to prevent unpredictable pauses during
+        # the simulation, which can cause jitter and missed deadlines.
+        gc.disable()
+        
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
         timer.start()
 
@@ -186,6 +192,9 @@ def simulate(trace_filename=None, error_filename=None):
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
     finally:
         # This block ensures cleanup happens on normal exit or Ctrl+C.
+        # Re-enable the garbage collector.
+        gc.enable()
+
         # The order is important for a graceful shutdown and correct user feedback.
         
         # 1. Stop the timer and simulation threads first.
