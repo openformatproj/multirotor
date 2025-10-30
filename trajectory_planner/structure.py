@@ -50,12 +50,19 @@ class Trajectory_Planner(Part):
             # ensure the current thread's precision context is used.
             pos_lambda = lambda t, idx=i.index(): conf.SET_POSITION(float(t))[idx]
             speed_lambda = lambda t, idx=i.index(): conf.SET_SPEED(float(t))[idx]
-
-            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, lambda t, op=pos_lambda: Number(op(t)))
-            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, lambda t, op=speed_lambda: Number(op(t)))
-            parts[f'{i.name()}_error_op'] = Operator(f'{i.name()}_error_op', 2, lambda target, measure: target - measure)
-            parts[f'{i.name()}_p_term_op'] = Operator(f'{i.name()}_p_term_op', 1, lambda error, gain=kp: gain * error)
-            parts[f'{i.name()}_sum_op'] = Operator(f'{i.name()}_sum_op', 2, lambda p_term, speed_ff: p_term + speed_ff)
+            
+            # Lambdas now perform calculations on native types and wrap the final result.
+            # This avoids creating intermediate Number objects.
+            parts[f'{i.name()}_set_pos_op'] = Operator(f'{i.name()}_set_pos_op', 1, 
+                lambda t, op=pos_lambda: Number(op(t)))
+            parts[f'{i.name()}_set_speed_op'] = Operator(f'{i.name()}_set_speed_op', 1, 
+                lambda t, op=speed_lambda: Number(op(t)))
+            parts[f'{i.name()}_error_op'] = Operator(f'{i.name()}_error_op', 2, 
+                lambda target, measure: Number(float(target) - float(measure)))
+            parts[f'{i.name()}_p_term_op'] = Operator(f'{i.name()}_p_term_op', 1, 
+                lambda error, gain=kp: Number(float(gain) * float(error)))
+            parts[f'{i.name()}_sum_op'] = Operator(f'{i.name()}_sum_op', 2, 
+                lambda p_term, speed_ff: Number(float(p_term) + float(speed_ff)))
 
         # Yaw speed is fixed at 0.0
         parts['yaw_speed_op'] = Operator('yaw_speed_op', 1, lambda _: Number('0.0'))

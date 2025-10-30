@@ -22,34 +22,33 @@ class Sensors(Part):
         are updated. It converts the quaternion orientation to Euler angles and
         sets the corresponding output ports.
         """
-        position = self.get_port('position').get()
-        orientation = self.get_port('orientation').get()
-        roll, pitch, yaw = pybullet.getEulerFromQuaternion(orientation)
-        linear_speed = self.get_port('linear_speed').get()
-        angular_speed = self.get_port('angular_speed').get()
+        # Get raw tuples/lists from the simulator
+        position_raw = self.get_port('position').get()
+        orientation_raw = self.get_port('orientation').get()
+        linear_speed_raw = self.get_port('linear_speed').get()
+        angular_speed_raw = self.get_port('angular_speed').get()
+
+        # Perform calculations on raw types for performance
+        roll, pitch, yaw = pybullet.getEulerFromQuaternion(orientation_raw)
+
+        # Convert final scalar values to Number objects at the boundary
         # IMU (linear acceleration)
         self.get_port('roll').set(Number(roll)) # phi
         self.get_port('pitch').set(Number(pitch)) # theta
         # compass
         self.get_port('yaw').set(Number(yaw)) # psi
         # IMU (angular speed)
-        self.get_port('roll_speed').set(Number(angular_speed[X.index()]))
-        self.get_port('pitch_speed').set(Number(angular_speed[Y.index()]))
-        self.get_port('yaw_speed').set(Number(angular_speed[Z.index()]))
+        self.get_port('roll_speed').set(Number(angular_speed_raw[X.index()]))
+        self.get_port('pitch_speed').set(Number(angular_speed_raw[Y.index()]))
+        self.get_port('yaw_speed').set(Number(angular_speed_raw[Z.index()]))
         # Ground station
-        x = position[X.index()]
-        y = position[Y.index()]
-        z = position[Z.index()]
-        x_speed = linear_speed[X.index()]
-        y_speed = linear_speed[Y.index()]
-        z_speed = linear_speed[Z.index()]
-        self.get_port('x').set(Number(x))
-        self.get_port('y').set(Number(y))
-        self.get_port('x_speed').set(Number(x_speed))
-        self.get_port('y_speed').set(Number(y_speed))
+        self.get_port('x').set(Number(position_raw[X.index()]))
+        self.get_port('y').set(Number(position_raw[Y.index()]))
+        self.get_port('x_speed').set(Number(linear_speed_raw[X.index()]))
+        self.get_port('y_speed').set(Number(linear_speed_raw[Y.index()]))
         # altitude sensors
-        self.get_port('z').set(Number(z))
-        self.get_port('z_speed').set(Number(z_speed))
+        self.get_port('z').set(Number(position_raw[Z.index()]))
+        self.get_port('z_speed').set(Number(linear_speed_raw[Z.index()]))
 
     def __init__(self, identifier):
         """
