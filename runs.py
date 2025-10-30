@@ -154,7 +154,7 @@ def simulate(trace_filename=None, error_filename=None):
                 error_file=error_filename
             )
 
-        top = Top('top', conf=sim_conf, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution)
+        top = Top('top', conf=sim_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()

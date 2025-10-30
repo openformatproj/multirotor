@@ -2,6 +2,13 @@ from ml.engine import Part, Port, EventQueue
 from ml.strategies import sequential_execution
 from ml.parts import EventToDataSynchronizer
 import pybullet
+try:
+    # Attempt to import the C-API for GIL release context manager.
+    # This is an internal, undocumented feature of PyBullet.
+    from pybullet_utils.pybullet_c_api import allowInternalThreadCaches
+except ImportError:
+    # Fallback for older PyBullet versions or if the internal API changes.
+    from contextlib import nullcontext as allowInternalThreadCaches
 from ml.data import Number
 import os
 import sys
@@ -217,7 +224,10 @@ class Rigid_Body_Simulator(Part):
             
             # Only step the simulation after new forces have been applied.
             try:
-                self.engine.stepSimulation()
+                # Release the GIL during the physics step to allow other Python
+                # threads (like the Timer) to run concurrently.
+                with allowInternalThreadCaches(self.engine):
+                    self.engine.stepSimulation()
             except self.engine.error as e:
                 raise RuntimeError(ERR_PYBULLET_STEP_FAILED) from e
 
