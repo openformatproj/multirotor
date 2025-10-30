@@ -42,3 +42,6 @@ SPEED_GRAPH_BOUNDARIES = [(-w * graph_margin, w * graph_margin), (-w * graph_mar
 
 GUI = False
 PLOT = True
+
+# Tracer configuration
+TRACER_ENABLED = False # Set to True to enable tracing, False to disable

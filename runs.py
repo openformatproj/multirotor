@@ -144,16 +144,17 @@ def simulate(trace_filename=None, error_filename=None):
             # Wait a moment for the server to initialize and start listening
             time.sleep(1.5)
 
-        # Start the tracer
-        Tracer.start(
-            level=LogLevel.TRACE,
-            flush_interval_seconds=5.0,
-            output_file=trace_filename,
-            log_to_console=True,
-            error_file=error_filename
-        )
+        # Conditionally start the tracer based on configuration
+        if sim_conf.TRACER_ENABLED:
+            Tracer.start(
+                level=LogLevel.TRACE,
+                flush_interval_seconds=5.0,
+                output_file=trace_filename,
+                log_to_console=True,
+                error_file=error_filename
+            )
 
-        top = Top('top', conf=sim_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
+        top = Top('top', conf=sim_conf, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -200,8 +201,9 @@ def simulate(trace_filename=None, error_filename=None):
             plot_server_process.terminate()
 
         # 3. Stop the tracer. This is a blocking call that flushes final logs.
-        Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
-        Tracer.stop()
+        if sim_conf.TRACER_ENABLED:
+            Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
+            Tracer.stop()
 
 def export_diagram(structure_filename=None):
     """
