@@ -11,11 +11,9 @@ except ImportError:
     from contextlib import nullcontext as allowInternalThreadCaches
 from ml.data import Number
 import os
-import sys
 
 from ml import conf as ml_conf
 
-sys.path.append(os.path.dirname(__file__))
 from services import generate_urdf_model
 from world.services import generate_world
 from propeller.description import Propeller

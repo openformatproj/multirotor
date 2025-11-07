@@ -1,10 +1,4 @@
 import os
-import sys
-
-# Add the 'src' directory to the Python path to allow for absolute imports
-# of modules within the project (e.g., 'plotting', 'description').
-# This must be done before any project-specific imports.
-sys.path.append(os.path.dirname(__file__))
 
 import json
 import gc
