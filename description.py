@@ -19,7 +19,7 @@ from world.services import generate_world
 from propeller.description import Propeller
 from motor.description import Motor
 from sensors.description import Sensors
-from trajectory_planner.structure import Trajectory_Planner
+from trajectory_planner.description import Trajectory_Planner
 from controller.description import Controller
 from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
