@@ -1,4 +1,5 @@
 import os
+import sys
 
 import json
 import gc
@@ -230,24 +231,33 @@ def simulate(trace_filename=None, error_filename=None):
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
 
-def export_diagram(structure_filename=None):
+def export_diagram(structure_filename=None, part_id=None):
     """
     Instantiates the Multirotor model, serializes its structure to JSON,
     and saves it to a file.
+
+    Args:
+        structure_filename (str): The path to save the JSON file.
+        part_id (str): The dot-separated ID of the part to export (e.g., 'multirotor.controller').
     """
     print(MSG_DIAG_INSTANTIATING)
-    top = Top('top')
-    multirotor_part = top.get_part('multirotor')
-    print(MSG_DIAG_PART_FOUND.format(multirotor_part.get_identifier()))
+    top = Top('top', conf=Configuration())
+    
+    # Traverse the hierarchy to find the requested part
+    part = top
+    if part_id:
+        for child_id in part_id.split('.'):
+            part = part.get_part(child_id)
+
+    print(MSG_DIAG_PART_FOUND.format(part.get_full_identifier()))
 
     serializer = DiagramSerializer()
-
     try:
         print(MSG_DIAG_SERIALIZING)
-        json_output = serializer.export_part_to_json(multirotor_part)
+        json_output = serializer.export_part_to_json(part)
         with open(structure_filename, 'w') as f:
             f.write(json_output)
-        print(MSG_DIAG_EXPORT_SUCCESS.format(multirotor_part.get_identifier(), structure_filename))
+        print(MSG_DIAG_EXPORT_SUCCESS.format(part.get_full_identifier(), structure_filename))
     except TypeError as e:
         print(MSG_DIAG_EXPORT_ERROR.format(e))
 
