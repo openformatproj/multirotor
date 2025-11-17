@@ -214,11 +214,11 @@ class Rigid_Body_Simulator(Part):
         # This uses the control inputs calculated in the previous simulation step.
         if all(p.is_updated() for p in self.thrust_ports) and all(p.is_updated() for p in self.torque_ports):
             for i, (thrust_port, torque_port) in enumerate(zip(self.thrust_ports, self.torque_ports)):
-                thrust = thrust_port.get()
-                torque = torque_port.get()
+                thrust = float(thrust_port.get())
+                torque = float(torque_port.get())
                 # The link index `i` from enumerate is 0-based, which matches PyBullet's link indexing.
-                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
-                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
+                self.engine.applyExternalForce(self.multirotor_avatar, i, [0, 0, thrust], [0, 0, 0], self.engine.LINK_FRAME)
+                self.engine.applyExternalTorque(self.multirotor_avatar, i, [0, 0, torque], self.engine.LINK_FRAME)
             
             # Only step the simulation after new forces have been applied.
             try:
@@ -232,7 +232,7 @@ class Rigid_Body_Simulator(Part):
         # After stepping, read the new state and set the output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
         self.get_port(MULTIROTOR_POSITION_PORT).set(position)
-        self.get_port(MULTIROTOR_ORIENTATION_PORT).set(orientation)
+        self.get_port(MULTIROTOR_ORIENTATION_PORT).set(pybullet.getEulerFromQuaternion(orientation))
         linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)

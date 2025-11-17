@@ -1,7 +1,6 @@
 from ml.engine import Part, Port
 from ml.data import Number
 from constants import X, Y, Z, ROLL, PITCH, YAW
-import pybullet
 
 class Sensors(Part):
     """
@@ -28,8 +27,7 @@ class Sensors(Part):
         linear_speed_raw = self.get_port('linear_speed').get()
         angular_speed_raw = self.get_port('angular_speed').get()
 
-        # Perform calculations on raw types for performance
-        roll, pitch, yaw = pybullet.getEulerFromQuaternion(orientation_raw)
+        roll, pitch, yaw = orientation_raw
 
         # Convert final scalar values to Number objects at the boundary
         # IMU (linear acceleration)
