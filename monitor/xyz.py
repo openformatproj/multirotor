@@ -1,6 +1,7 @@
 import socket
 import json
 from ml.engine import Part, Port
+from ml.strategies import time_updated
 from ml.tracer import Tracer
 from ml.enums import LogLevel
 from . import conf as monitor_conf
@@ -39,7 +40,7 @@ class XYZ_Monitor(Part):
             Port('x', Port.IN), Port('y', Port.IN), Port('z', Port.IN),
             Port('x_speed', Port.IN), Port('y_speed', Port.IN), Port('z_speed', Port.IN)
         ]
-        super().__init__(identifier, ports=ports, scheduling_condition=lambda p: p.get_port('time').is_updated())
+        super().__init__(identifier, ports=ports, scheduling_condition=time_updated)
 
         self.host = host
         self.port = port

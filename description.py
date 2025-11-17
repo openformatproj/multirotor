@@ -1,5 +1,5 @@
 from ml.engine import Part, Port, EventQueue
-from ml.strategies import sequential_execution
+from ml.strategies import sequential_execution, all_input_ports_updated, time_updated
 from ml.parts import EventToDataSynchronizer
 import pybullet
 try:
@@ -129,7 +129,7 @@ class Multirotor(Part):
             execution_strategy=sequential_execution,
             ports=ports,
             parts=parts,
-            scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN)),
+            scheduling_condition=all_input_ports_updated,
             conf=conf
         )
         
@@ -255,7 +255,7 @@ class Rigid_Body_Simulator(Part):
         for i in PROPELLERS_INDEXES:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
-        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
+        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=time_updated)
         self.engine = None
         self.multirotor_avatar = None
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]

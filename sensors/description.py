@@ -1,5 +1,6 @@
 from ml.engine import Part, Port
 from ml.data import Number
+from ml.strategies import all_input_ports_updated
 from constants import X, Y, Z, ROLL, PITCH, YAW
 
 class Sensors(Part):
@@ -74,5 +75,5 @@ class Sensors(Part):
             identifier=identifier,
             ports=ports,
             # This part should only run when all its inputs are ready.
-            scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN))
+            scheduling_condition=all_input_ports_updated
         )

@@ -1,4 +1,5 @@
 from ml.engine import Port, Part
+from ml.strategies import all_input_ports_updated
 
 class Motor(Part):
     """
@@ -59,5 +60,5 @@ class Motor(Part):
             identifier=identifier,
             ports=ports,
             # This part should only run when all its inputs are ready.
-            scheduling_condition=lambda part: all(p.is_updated() for p in part.get_ports(Port.IN))
+            scheduling_condition=all_input_ports_updated
         )
