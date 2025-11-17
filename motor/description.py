@@ -1,5 +1,4 @@
 from ml.engine import Port, Part
-from ml.data import Number
 
 class Motor(Part):
     """
