@@ -21,14 +21,17 @@ from datetime import datetime
 from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
+import sim_conf
 
 class Configuration:
     """A simple object to hold and pass simulation configuration."""
-    def __init__(self):
-        # Load all variables from the conf module into this object
-        for key, value in vars(conf).items():
-            if not key.startswith('__'):
-                setattr(self, key, value)
+    def __init__(self, *configurations):
+        """Loads and merges variables from one or more configuration modules."""
+        for configuration in configurations:
+            # Load all variables from the conf module into this object
+            for key, value in vars(configuration).items():
+                if not key.startswith('__'):
+                    setattr(self, key, value)
 
 # --- Log constants ---
 MAIN_COMPONENT_ID = "MAIN"
@@ -141,16 +144,16 @@ def set_high_priority():
 def simulate(trace_filename=None, error_filename=None):
 
     # Create a configuration object that holds all parameters.
-    sim_conf = Configuration()
+    proj_conf = Configuration(conf, sim_conf)
 
     plot_server_process = None
     top = None
     try:
-        if sim_conf.PLOT:
+        if proj_conf.PLOT:
             print(MSG_PLOT_SERVER_STARTING)
             plot_server_process = multiprocessing.Process(
                 target=run_plot_server,
-                args=(sim_conf.POSITION_GRAPH_BOUNDARIES, sim_conf.SPEED_GRAPH_BOUNDARIES)
+                args=(proj_conf.POSITION_GRAPH_BOUNDARIES, proj_conf.SPEED_GRAPH_BOUNDARIES)
             )
             plot_server_process.daemon = True  # Ensure the process exits with the main script
             plot_server_process.start()
@@ -158,7 +161,7 @@ def simulate(trace_filename=None, error_filename=None):
             time.sleep(1.5)
 
         # Conditionally start the tracer based on configuration
-        if sim_conf.TRACER_ENABLED:
+        if proj_conf.TRACER_ENABLED:
             Tracer.start(
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
@@ -167,7 +170,7 @@ def simulate(trace_filename=None, error_filename=None):
                 error_file=error_filename
             )
 
-        top = Top('top', conf=sim_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
+        top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -178,8 +181,8 @@ def simulate(trace_filename=None, error_filename=None):
         # with the timer, which is crucial for exposing performance bottlenecks.
         # In non-real-time mode (`DROP`), it drops events to keep running,
         # which can be useful for non-critical runs or debugging.
-        on_full_behavior = OnFullBehavior.FAIL if sim_conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-        timer = Timer(identifier='physics_timer', interval_seconds=sim_conf.TIME_STEP, on_full=on_full_behavior)
+        on_full_behavior = OnFullBehavior.FAIL if proj_conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
+        timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior)
 
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
@@ -192,7 +195,7 @@ def simulate(trace_filename=None, error_filename=None):
 
         # For real-time simulations, increase process priority to minimize
         # OS scheduler jitter, which can cause timer inaccuracies.
-        if sim_conf.HIGH_PRIORITY:
+        if proj_conf.HIGH_PRIORITY:
             set_high_priority()
         
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
@@ -227,7 +230,7 @@ def simulate(trace_filename=None, error_filename=None):
             plot_server_process.terminate()
 
         # 3. Stop the tracer. This is a blocking call that flushes final logs.
-        if sim_conf.TRACER_ENABLED:
+        if proj_conf.TRACER_ENABLED:
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
 
@@ -241,7 +244,8 @@ def export_diagram(structure_filename=None, part_id=None):
         part_id (str): The dot-separated ID of the part to export (e.g., 'multirotor.controller').
     """
     print(MSG_DIAG_INSTANTIATING)
-    top = Top('top', conf=Configuration())
+    proj_conf = Configuration(conf, sim_conf)
+    top = Top('top', conf=proj_conf)
     
     # Traverse the hierarchy to find the requested part
     part = top

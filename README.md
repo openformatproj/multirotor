@@ -1,6 +1,7 @@
 - [Introduction](#introduction)
   - [Advantages](#advantages)
 - [Quick Start](#quick-start)
+  - [Configuration](#configuration)
 - [Overview](#overview)
 - [Tags](#tags)
 - [Improvement Areas](#improvement-areas)
@@ -54,16 +55,64 @@ This script builds the multirotor architecture, initializes it and starts the si
 ![Figure 2: Multirotor simulation - Position plot](img/2.gif)
 <p align="center">Figure 2: Multirotor simulation - Position plot (matplotlib)</p>
 
-By default, `src/conf.py` configures the multirotor to follow a circular trajectory around the origin:
+The content of this repository is available in the `/workspaces/multirotor/src` folder of the Docker image.
+
+## Configuration
+
+A `src/sim_conf.py` file must be available. This is an example:
 
 ```python
-SET_POSITION = lambda t : [cos(w*t), sin(w*t), 1 + a*sin(q*t)]
-SET_SPEED = lambda t : [w * (-sin(w*t)), w * cos(w*t), a * q * cos(q*t)]
+from math import cos, sin
+from ml.data import DECIMAL, FLOAT, NUMPY
+
+# --- Numerical Backend Configuration ---
+# Sets the numerical computation backend. Options: `NUMPY` (fastest), `FLOAT`, `DECIMAL`.
+NUMBER_IMPLEMENTATION = NUMPY
+# Sets the precision for calculations if `NUMBER_IMPLEMENTATION` is `DECIMAL`.
+DECIMAL_CONTEXT_PRECISION = 4
+
+# --- Simulation Execution Configuration ---
+# If `True`, the simulation fails if it cannot keep up with the wall-clock time defined by `TIME_STEP`.
+REAL_TIME_SIMULATION = False
+# If `True`, increases the OS process priority to reduce scheduling jitter, crucial for `REAL_TIME_SIMULATION`.
+HIGH_PRIORITY = False
+
+# --- Visualization and Debugging ---
+# If `True`, runs the PyBullet simulation with a graphical user interface. `False` runs in headless mode.
+GUI = False
+# If `True`, enables the real-time `matplotlib` server for plotting position and speed.
+PLOT = True
+# A factor to reduce the number of points sent to the plotter (e.g., `10` means 1 out of every 10 points is plotted).
+PLOT_DECIMATION = 10
+# If `True`, activates detailed performance and dataflow logging for analysis.
+TRACER_ENABLED = False
+
+# --- Initial State Configuration ---
+# The starting `[x, y, z]` position of the multirotor in the simulation world.
+INITIAL_POSITION = [1, 0, 1]
+# The starting `[roll, pitch, yaw]` orientation of the multirotor.
+INITIAL_ROTATION = [0, 0, 0]
+
+# --- Trajectory and Plotting Parameters ---
+# Parameters defining the shape of the default helical trajectory.
+w = 0.5  # `w`: xy angular speed in rad/s
+q = 1.0  # `q`: z angular speed in rad/s
+a = 0.7  # `a`: z amplitude in rad/s
+graph_margin = 1.5
+
+# A function `lambda t: [x, y, z]` that defines the target position of the multirotor over time `t`.
+SET_POSITION = lambda t: [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
+# A function `lambda t: [vx, vy, vz]` that defines the target speed of the multirotor over time `t`.
+SET_SPEED = lambda t: [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
+# Defines the fixed axis limits for the position plot.
+POSITION_GRAPH_BOUNDARIES = [(-1 * graph_margin, 1 * graph_margin), (-1 * graph_margin, 1 * graph_margin), ((1 - a * graph_margin), (1 + a * graph_margin))]
+# Defines the fixed axis limits for the speed plot.
+SPEED_GRAPH_BOUNDARIES = [(-w * graph_margin, w * graph_margin), (-w * graph_margin, w * graph_margin), (-a * q * graph_margin, a * q * graph_margin)]
 ```
 
-This behavior can be easily changed from the script itself.
+In this case, the multirotor is configured to follow a circular trajectory around the origin.
 
-The content of this repository is available in the `/workspaces/multirotor/src` folder of the Docker image.
+`src/sim_conf.py` is not tracked by Git, allowing you to customize simulation parameters without modifying the core configuration.
 
 # Overview
 

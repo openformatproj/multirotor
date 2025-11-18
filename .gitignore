@@ -1,6 +1,7 @@
 **/__pycache__/
 /controller/*
 /*.code-workspace
+sim_conf.py
 /.vscode
 /img/*.webm
 /img/*.drawio
