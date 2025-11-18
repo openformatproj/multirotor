@@ -4,13 +4,12 @@ import sys
 import json
 import gc
 import platform
-import threading
 import time
 import multiprocessing
 from functools import partial
 from typing import Optional
 from PyQt5.QtWidgets import QApplication
-from ml.strategies import sequential_execution, execute
+from ml.strategies import sequential_execution, parallel_execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log
 from ml.enums import OnFullBehavior, LogLevel
@@ -57,73 +56,6 @@ MSG_DIAG_FILE_NOT_FOUND = "Error: JSON file '{}' not found. Please run with 'exp
 MSG_DIAG_LOADING = "Loading diagram from '{}'..."
 MSG_DIAG_IMPORT_SUCCESS = "Diagram imported successfully."
 MSG_DIAG_IMPORT_ERROR = "Error importing diagram: {}"
-def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
-    """
-    A custom execution strategy that runs the 'atas' mixer and all PID-based
-    'Control_Element' parts in separate threads, while executing any other
-    parts sequentially. This parallelizes the main computational load of the
-    controller.
-    """
-    parallelizable_parts = []
-    sequential_parts = []
-    threads = []
-
-    # Separate the parts that can be run in parallel from the others
-    for part in scheduled_parts:
-        part_id = part.get_identifier()
-        if part_id == 'atas' or 'control_element' in part_id:
-            parallelizable_parts.append(part)
-        else:
-            sequential_parts.append(part)
-
-    creator_thread_name = threading.current_thread().name
-
-    # Start each parallelizable part in its own thread
-    for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
-        thread.start()
-        threads.append(thread)
-
-    # Execute the rest of the parts sequentially in the main thread while parallel threads run
-    if sequential_parts:
-        sequential_execution(parent_part, sequential_parts, strategy_event)
-
-    # Wait for all parallel threads to finish before the strategy returns
-    for thread in threads:
-        thread.join()
-
-
-def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
-    """
-    A custom execution strategy that runs the main 'simulator' and 'multirotor'
-    parts in parallel threads, as they are the main computational loads and
-    are independent within a single step. Any other parts are run sequentially.
-    """
-    parallelizable_parts = []
-    sequential_parts = []
-    threads = []
-
-    # Separate the parts that can be run in parallel
-    for part in scheduled_parts:
-        part_id = part.get_identifier()
-        if part_id in ['simulator', 'multirotor']:
-            parallelizable_parts.append(part)
-        else:
-            sequential_parts.append(part)
-
-    creator_thread_name = threading.current_thread().name
-
-    for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
-        thread.start()
-        threads.append(thread)
-
-    # Execute sequential parts (if any) in the main thread while parallel threads run
-    if sequential_parts:
-        sequential_execution(parent_part, sequential_parts, strategy_event)
-
-    for thread in threads:
-        thread.join()
 
 def set_high_priority():
     """
@@ -160,15 +92,28 @@ def simulate(trace_filename=None, error_filename=None):
             # Wait a moment for the server to initialize and start listening
             time.sleep(1.5)
 
+        log_queue = None
         # Conditionally start the tracer based on configuration
         if proj_conf.TRACER_ENABLED:
+            log_queue = multiprocessing.Queue()
             Tracer.start(
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
                 output_file=trace_filename,
                 log_to_console=True,
-                error_file=error_filename
+                error_file=error_filename,
+                log_queue=log_queue
             )
+
+        # Define execution strategies using the new generic parallel_execution function
+        def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
+            condition = lambda part: part.get_identifier() in {'simulator', 'multirotor'}
+            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode='thread', log_queue=log_queue)
+                
+        # The controller's parallel strategy is defined for completeness, though currently unused.
+        def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
+            condition = lambda part: part.get_identifier() == 'atas' or 'control_element' in part.get_identifier()
+            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode='thread', log_queue=log_queue)
 
         top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
