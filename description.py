@@ -24,7 +24,6 @@ from controller.description import Controller
 from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
 
-PROPELLERS_INDEXES = None # Will be initialized in Top
 
 # --- Component Identifiers ---
 SENSORS_ID = 'sensors'
@@ -109,7 +108,7 @@ class Multirotor(Part):
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=controller_execution_strategy)
+            CONTROLLER_ID: Controller(CONTROLLER_ID, range(1, conf.PROPELLERS + 1), conf=conf, execution_strategy=controller_execution_strategy)
         }
         if conf.PLOT:
             parts[PLOTTER_ID] = XYZ_Monitor(
@@ -117,7 +116,7 @@ class Multirotor(Part):
                 plot_decimation=conf.PLOT_DECIMATION
             )
 
-        for i in PROPELLERS_INDEXES:
+        for i in range(1, conf.PROPELLERS + 1):
             ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
             ports.append(Port(TORQUE_PORT_TPL.format(i), Port.OUT))
             parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i))
@@ -151,7 +150,7 @@ class Multirotor(Part):
             self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_SETPOINT_PORT_TPL.format(i.name())))
             self.connect(self.get_part(SENSORS_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_PORT_TPL.format(i.name())))
         self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(YAW_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(YAW_SPEED_SETPOINT_PORT))
-        for i in PROPELLERS_INDEXES:
+        for i in range(1, conf.PROPELLERS + 1):
             self.connect(self.get_port(TIME_PORT), self.get_part(PROPELLER_ID_TPL.format(i)).get_port(TIME_PORT))
             self.connect(self.get_port(TIME_PORT), self.get_part(MOTOR_ID_TPL.format(i)).get_port(TIME_PORT))
             self.connect(self.get_part(CONTROLLER_ID).get_port(ANGULAR_SPEED_PORT_TPL.format(i)), self.get_part(MOTOR_ID_TPL.format(i)).get_port(ANGULAR_SPEED_IN_PORT))
@@ -291,14 +290,15 @@ class Rigid_Body_Simulator(Part):
             Port(MULTIROTOR_LINEAR_SPEED_PORT, Port.OUT),
             Port(MULTIROTOR_ANGULAR_SPEED_PORT, Port.OUT)
         ]
-        for i in PROPELLERS_INDEXES:
+        propellers_indexes = range(1, conf.PROPELLERS + 1)
+        for i in propellers_indexes:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
         super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=time_updated)
         self.engine = None
         self.multirotor_avatar = None
-        self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
-        self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in propellers_indexes]
+        self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in propellers_indexes]
         self.add_hook(ml_conf.HOOK_TYPE_INIT, self._init_pybullet)
         self.add_hook(ml_conf.HOOK_TYPE_TERM, self._term_pybullet)
 
@@ -323,8 +323,6 @@ class Top(Part):
             controller_execution_strategy: The execution strategy for the controller,
                                            passed down to the Multirotor part.
         """
-        global PROPELLERS_INDEXES
-        PROPELLERS_INDEXES = range(1, conf.PROPELLERS + 1)
 
         # Configure the Number class globally before any parts are instantiated.
         Number.configure(conf)
@@ -361,6 +359,6 @@ class Top(Part):
         self.connect(simulator.get_port(MULTIROTOR_ORIENTATION_PORT), multirotor.get_port(ORIENTATION_PORT))
         self.connect(simulator.get_port(MULTIROTOR_LINEAR_SPEED_PORT), multirotor.get_port(LINEAR_SPEED_PORT))
         self.connect(simulator.get_port(MULTIROTOR_ANGULAR_SPEED_PORT), multirotor.get_port(ANGULAR_SPEED_PORT))
-        for i in PROPELLERS_INDEXES:
+        for i in range(1, conf.PROPELLERS + 1):
             self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)))
             self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)))

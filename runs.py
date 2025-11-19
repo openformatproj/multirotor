@@ -20,6 +20,7 @@ from datetime import datetime
 from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
+import types
 import sim_conf
 
 class Configuration:
@@ -30,7 +31,11 @@ class Configuration:
             # Load all variables from the conf module into this object
             for key, value in vars(configuration).items():
                 if not key.startswith('__'):
-                    setattr(self, key, value)
+                    # Only copy attributes that are not modules or functions, as they are unpicklable.
+                    # This prevents multiprocessing errors when passing the configuration.
+                    is_module = isinstance(value, types.ModuleType)
+                    if not is_module:
+                        setattr(self, key, value)
 
 # --- Log constants ---
 MAIN_COMPONENT_ID = "MAIN"
