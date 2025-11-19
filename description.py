@@ -9,7 +9,7 @@ try:
 except ImportError:
     # Fallback for older PyBullet versions or if the internal API changes.
     from contextlib import nullcontext as allowInternalThreadCaches
-from ml.data import Number
+
 import os
 
 from ml import conf as ml_conf
@@ -323,9 +323,6 @@ class Top(Part):
             controller_execution_strategy: The execution strategy for the controller,
                                            passed down to the Multirotor part.
         """
-
-        # Configure the Number class globally before any parts are instantiated.
-        Number.configure(conf)
 
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {

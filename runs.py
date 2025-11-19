@@ -13,6 +13,7 @@ from ml.strategies import sequential_execution, parallel_execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log
 from ml.enums import OnFullBehavior, LogLevel
+from ml import data
 from diagrams.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
 from diagrams.optimization import run_simulated_annealing
@@ -120,6 +121,8 @@ def simulate(trace_filename=None, error_filename=None):
         def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
             condition = lambda part: part.get_identifier() == 'atas' or 'control_element' in part.get_identifier()
             return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
+
+        data.configure(proj_conf)
 
         top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
