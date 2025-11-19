@@ -63,12 +63,13 @@ A `src/sim_conf.py` file must be available. This is an example:
 
 ```python
 from math import cos, sin
-from ml.data import DECIMAL, FLOAT, NUMPY
+from ml.data import register_data_type, Number
 
 # --- Numerical Backend Configuration ---
-# Sets the numerical computation backend. Options: `NUMPY` (fastest), `FLOAT`, `DECIMAL`.
-NUMBER_IMPLEMENTATION = NUMPY
-# Sets the precision for calculations if `NUMBER_IMPLEMENTATION` is `DECIMAL`.
+register_data_type(Number)
+# Sets the numerical computation backend. Options: `Number.NUMPY` (fastest), `Number.FLOAT`, `Number.DECIMAL`.
+NUMBER_IMPLEMENTATION = Number.NUMPY
+# Sets the precision for calculations if `NUMBER_IMPLEMENTATION` is `Number.DECIMAL`.
 DECIMAL_CONTEXT_PRECISION = 4
 
 # --- Simulation Execution Configuration ---
