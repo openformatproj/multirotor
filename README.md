@@ -76,6 +76,8 @@ DECIMAL_CONTEXT_PRECISION = 4
 REAL_TIME_SIMULATION = False
 # If `True`, increases the OS process priority to reduce scheduling jitter, crucial for `REAL_TIME_SIMULATION`.
 HIGH_PRIORITY = False
+# Sets how to parallelize parts meant to be executed concurrently. Options: `'thread'`, `'process'`.
+PARALLEL_EXECUTION_MODE = 'thread'
 
 # --- Visualization and Debugging ---
 # If `True`, runs the PyBullet simulation with a graphical user interface. `False` runs in headless mode.

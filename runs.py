@@ -95,7 +95,8 @@ def simulate(trace_filename=None, error_filename=None):
         log_queue = None
         # Conditionally start the tracer based on configuration
         if proj_conf.TRACER_ENABLED:
-            log_queue = multiprocessing.Queue()
+            if proj_conf.PARALLEL_EXECUTION_MODE == 'process':
+                log_queue = multiprocessing.Queue()
             Tracer.start(
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
@@ -108,12 +109,12 @@ def simulate(trace_filename=None, error_filename=None):
         # Define execution strategies using the new generic parallel_execution function
         def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
             condition = lambda part: part.get_identifier() in {'simulator', 'multirotor'}
-            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode='thread', log_queue=log_queue)
+            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
                 
         # The controller's parallel strategy is defined for completeness, though currently unused.
         def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
             condition = lambda part: part.get_identifier() == 'atas' or 'control_element' in part.get_identifier()
-            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode='thread', log_queue=log_queue)
+            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
 
         top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
 
