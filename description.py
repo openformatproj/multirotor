@@ -178,12 +178,51 @@ class Rigid_Body_Simulator(Part):
     be fed back into the model. It acts as the bridge between the control
     system and the simulated physical world.
     """
-    def _set_engine(self, engine):
+    def _init_pybullet(self):
+        """
+        Initialization hook that connects to the PyBullet physics engine.
+
+        It sets the connection mode (GUI or headless), configures gravity and
+        the simulation time step, and passes the engine instance to the simulator part.
+        """
+        self.engine = pybullet
+        # Use DIRECT for headless simulation, GUI for visualization.
+        mode_str = 'GUI' if self.conf.GUI else 'DIRECT'
+        connection_mode = self.engine.GUI if self.conf.GUI else self.engine.DIRECT
+        try:
+            # Connect to the physics engine. This can fail if GUI is requested
+            # but no graphical environment is available.
+            self.engine.connect(connection_mode)
+        except self.engine.error as e:
+            # Re-raise pybullet's specific error as a more general RuntimeError
+            # with context, which will be handled by the main run loop.
+            raise RuntimeError(ERR_PYBULLET_CONNECT_FAILED.format(mode_str)) from e
+
+        if not self.engine.isConnected():
+            # This is a fallback for the unlikely case that connect() returns
+            # without error but fails to establish a connection.
+            raise RuntimeError(ERR_PYBULLET_CONNECT_NO_EXCEPTION)
+
+        # Configure the physics engine. This is critical for stability.
+        self.engine.setGravity(0, 0, self.conf.G)
+        self.engine.setTimeStep(self.conf.TIME_STEP)
+        self.engine.setRealTimeSimulation(0) # We are driving the simulation manually
+
+        self._set_engine()
+
+    def _term_pybullet(self):
+        """
+        Termination hook that gracefully disconnects from the PyBullet engine
+        if a connection is active.
+        """
+        if self.engine and self.engine.isConnected():
+            self.engine.disconnect()
+
+    def _set_engine(self):
         """
         Initializes the simulator with a PyBullet engine instance, generating
         the world and loading the URDF model.
         """
-        self.engine = engine
         generate_world(self.engine)
         if self.conf.UPDATE_URDF_MODEL:
             generate_urdf_model(self.conf.BASE_DIRECTORY, self.conf.URDF_MODEL, self.conf.URDF_TEMPLATE, self.conf.FRAME_MASS, self.conf.FRAME_SIZE, self.conf.PROPELLERS, self.conf.MAIN_RADIUS)
@@ -260,6 +299,8 @@ class Rigid_Body_Simulator(Part):
         self.multirotor_avatar = None
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
         self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, self._init_pybullet)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, self._term_pybullet)
 
 
 class Top(Part):
@@ -272,46 +313,6 @@ class Top(Part):
     event source. It manages the lifecycle of the PyBullet connection via
     init and term hooks.
     """
-    def _init_pybullet(self):
-        """
-        Initialization hook that connects to the PyBullet physics engine.
-
-        It sets the connection mode (GUI or headless), configures gravity and
-        the simulation time step, and passes the engine instance to the simulator part.
-        """
-        self.engine = pybullet
-        # Use DIRECT for headless simulation, GUI for visualization.
-        mode_str = 'GUI' if self.conf.GUI else 'DIRECT'
-        connection_mode = self.engine.GUI if self.conf.GUI else self.engine.DIRECT
-        try:
-            # Connect to the physics engine. This can fail if GUI is requested
-            # but no graphical environment is available.
-            self.engine.connect(connection_mode)
-        except self.engine.error as e:
-            # Re-raise pybullet's specific error as a more general RuntimeError
-            # with context, which will be handled by the main run loop.
-            raise RuntimeError(ERR_PYBULLET_CONNECT_FAILED.format(mode_str)) from e
-
-        if not self.engine.isConnected():
-            # This is a fallback for the unlikely case that connect() returns
-            # without error but fails to establish a connection.
-            raise RuntimeError(ERR_PYBULLET_CONNECT_NO_EXCEPTION)
-
-        # Configure the physics engine. This is critical for stability.
-        self.engine.setGravity(0, 0, self.conf.G)
-        self.engine.setTimeStep(self.conf.TIME_STEP)
-        self.engine.setRealTimeSimulation(0) # We are driving the simulation manually
-
-        self.get_part(SIMULATOR_ID)._set_engine(self.engine)
-
-    def _term_pybullet(self):
-        """
-        Termination hook that gracefully disconnects from the PyBullet engine
-        if a connection is active.
-        """
-        if self.engine and self.engine.isConnected():
-            self.engine.disconnect()
-
     def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
         """
         Initializes the Top structural part.
@@ -328,7 +329,6 @@ class Top(Part):
         # Configure the Number class globally before any parts are instantiated.
         Number.configure(conf)
 
-        self.engine = None
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
             TIME_DIST_ID: EventToDataSynchronizer(
@@ -364,5 +364,3 @@ class Top(Part):
         for i in PROPELLERS_INDEXES:
             self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)))
             self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)))
-        self.add_hook(ml_conf.HOOK_TYPE_INIT, self._init_pybullet)
-        self.add_hook(ml_conf.HOOK_TYPE_TERM, self._term_pybullet)
