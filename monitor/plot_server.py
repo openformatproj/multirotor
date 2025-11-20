@@ -2,12 +2,9 @@ import socket
 import json
 import os
 import sys
-import time
 from PyQt5.QtWidgets import QApplication
 import signal
-from PyQt5.QtCore import QTimer
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from . import conf as monitor_conf
 
 # --- Constants ---
