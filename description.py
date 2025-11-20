@@ -1,7 +1,6 @@
 from ml.engine import Part, Port, EventQueue
 from ml.strategies import sequential_execution, all_input_ports_updated, time_updated
 from ml.parts import EventToDataSynchronizer
-import pybullet
 try:
     # Attempt to import the C-API for GIL release context manager.
     # This is an internal, undocumented feature of PyBullet.
@@ -184,6 +183,7 @@ class Rigid_Body_Simulator(Part):
         It sets the connection mode (GUI or headless), configures gravity and
         the simulation time step, and passes the engine instance to the simulator part.
         """
+        import pybullet
         self.engine = pybullet
         # Use DIRECT for headless simulation, GUI for visualization.
         mode_str = 'GUI' if self.conf.GUI else 'DIRECT'
@@ -270,7 +270,7 @@ class Rigid_Body_Simulator(Part):
         # After stepping, read the new state and set the output ports for the next control cycle.
         position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
         self.get_port(MULTIROTOR_POSITION_PORT).set(position)
-        self.get_port(MULTIROTOR_ORIENTATION_PORT).set(pybullet.getEulerFromQuaternion(orientation))
+        self.get_port(MULTIROTOR_ORIENTATION_PORT).set(self.engine.getEulerFromQuaternion(orientation))
         linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
