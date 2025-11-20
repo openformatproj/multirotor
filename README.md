@@ -103,10 +103,12 @@ q = 1.0  # `q`: z angular speed in rad/s
 a = 0.7  # `a`: z amplitude in rad/s
 graph_margin = 1.5
 
-# A function `lambda t: [x, y, z]` that defines the target position of the multirotor over time `t`.
-SET_POSITION = lambda t: [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
-# A function `lambda t: [vx, vy, vz]` that defines the target speed of the multirotor over time `t`.
-SET_SPEED = lambda t: [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
+# A function that defines the target position of the multirotor over time `t`.
+def SET_POSITION(t):
+    return [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
+# A function that defines the target speed of the multirotor over time `t`.
+def SET_SPEED(t):
+    return [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
 # Defines the fixed axis limits for the position plot.
 POSITION_GRAPH_BOUNDARIES = [(-1 * graph_margin, 1 * graph_margin), (-1 * graph_margin, 1 * graph_margin), ((1 - a * graph_margin), (1 + a * graph_margin))]
 # Defines the fixed axis limits for the speed plot.
