@@ -8,7 +8,7 @@ import time
 import multiprocessing
 from functools import partial
 from typing import Optional
-from ml.strategies import sequential_execution, parallel_execution
+from ml.strategies import Execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log
 from ml.enums import OnFullBehavior, LogLevel
@@ -99,31 +99,33 @@ def simulate(trace_filename=None, error_filename=None):
 
         log_queue = None
         # Conditionally start the tracer based on configuration
+        error_queue = None
         if proj_conf.TRACER_ENABLED:
             if proj_conf.PARALLEL_EXECUTION_MODE == 'process':
                 log_queue = multiprocessing.Queue()
+                error_queue = multiprocessing.Queue()
             Tracer.start(
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
                 output_file=trace_filename,
                 log_to_console=True,
                 error_file=error_filename,
-                log_queue=log_queue
+                log_queue=log_queue,
+                error_queue=error_queue
             )
 
-        # Define execution strategies using the new generic parallel_execution function
-        def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
-            condition = lambda part: part.get_identifier() == 'multirotor'
-            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
-                
-        # The controller's parallel strategy is defined for completeness, though currently unused.
-        def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
-            condition = lambda part: part.get_identifier() == 'atas' or 'control_element' in part.get_identifier()
-            return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
+        top_execution = Execution(name='parallel_multirotor_execution',
+            parallelization_condition=lambda part: part.get_identifier() == 'multirotor',
+            mode=proj_conf.PARALLEL_EXECUTION_MODE,
+            log_queue=log_queue,
+            error_queue=error_queue
+        )
+
+        controller_execution = Execution.sequential()
 
         data.configure(proj_conf)
 
-        top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
+        top = Top('top', conf=proj_conf, execution_strategy=top_execution, controller_execution_strategy=controller_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
