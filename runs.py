@@ -8,7 +8,6 @@ import time
 import multiprocessing
 from functools import partial
 from typing import Optional
-from PyQt5.QtWidgets import QApplication
 from ml.strategies import sequential_execution, parallel_execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log
@@ -228,6 +227,7 @@ def import_diagram(structure_filename=None):
         return
 
     print(MSG_DIAG_LOADING.format(structure_filename))
+    from PyQt5.QtWidgets import QApplication
     with open(structure_filename, 'r') as f:
         json_data = f.read()
 
