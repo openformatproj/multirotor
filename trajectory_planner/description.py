@@ -1,5 +1,5 @@
 from ml.engine import Part, Port
-from ml.strategies import sequential_execution, all_input_ports_updated
+from ml.strategies import Execution, all_input_ports_updated
 from ml.data import Number
 from ml.parts import Operator
 from ml import conf as ml_conf
@@ -71,7 +71,7 @@ class Trajectory_Planner(Part):
             identifier=identifier,
             ports=ports,
             parts=parts,
-            execution_strategy=sequential_execution,
+            execution_strategy=Execution.sequential(),
             scheduling_condition=all_input_ports_updated,
             conf=conf
         )

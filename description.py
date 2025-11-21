@@ -1,5 +1,5 @@
 from ml.engine import Part, Port, EventQueue
-from ml.strategies import sequential_execution, all_input_ports_updated, time_updated
+from ml.strategies import Execution, all_input_ports_updated, time_updated
 from ml.parts import EventToDataSynchronizer
 
 import os
@@ -81,7 +81,7 @@ class Multirotor(Part):
     actuator outputs (thrust and torque) back to it.
     """
 
-    def __init__(self, identifier: str, conf: object, controller_execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, controller_execution_strategy: Execution):
         """
         Initializes the Multirotor structural part.
 
@@ -117,7 +117,7 @@ class Multirotor(Part):
             
         super().__init__(
             identifier=identifier,
-            execution_strategy=sequential_execution,
+            execution_strategy=Execution.sequential(),
             ports=ports,
             parts=parts,
             scheduling_condition=all_input_ports_updated,
@@ -314,7 +314,7 @@ class Top(Part):
     event source. It manages the lifecycle of the PyBullet connection via
     init and term hooks.
     """
-    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy: Execution, controller_execution_strategy: Execution):
         """
         Initializes the Top structural part.
 
