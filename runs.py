@@ -113,7 +113,7 @@ def simulate(trace_filename=None, error_filename=None):
 
         # Define execution strategies using the new generic parallel_execution function
         def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
-            condition = lambda part: part.get_identifier() in {'simulator', 'multirotor'}
+            condition = lambda part: part.get_identifier() == 'multirotor'
             return parallel_execution(parent_part, scheduled_parts, strategy_event, parallelization_condition=condition, mode=proj_conf.PARALLEL_EXECUTION_MODE, log_queue=log_queue)
                 
         # The controller's parallel strategy is defined for completeness, though currently unused.
