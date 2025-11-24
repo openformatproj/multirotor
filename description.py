@@ -121,7 +121,8 @@ class Multirotor(Part):
             ports=ports,
             parts=parts,
             scheduling_condition=all_input_ports_updated,
-            conf=conf
+            conf=conf,
+            controller_execution_strategy=controller_execution_strategy
         )
         
         self.connect(self.get_port(TIME_PORT), self.get_part(SENSORS_ID).get_port(TIME_PORT))
