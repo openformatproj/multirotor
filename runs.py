@@ -85,6 +85,7 @@ def simulate(trace_filename=None, error_filename=None):
 
     plot_server_process = None
     top = None
+    timer = None
     try:
         if proj_conf.PLOT:
             print(MSG_PLOT_SERVER_STARTING)
@@ -153,10 +154,19 @@ def simulate(trace_filename=None, error_filename=None):
         if proj_conf.HIGH_PRIORITY:
             set_high_priority()
         
+        # Start the simulation thread, which will spawn worker processes.
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
+
+        # If using persistent processes, block until all workers have confirmed they are initialized.
+        # This is not needed for 'thread' mode.
+        #if proj_conf.PARALLEL_EXECUTION_MODE == 'process':
+        top.wait_for_ready()
+
+        # Now that all components are ready, start the timer to begin event flow.
         timer.start()
 
-        top.wait() # Block until the simulation ends
+        # Block here and wait for the main simulation thread to finish.
+        top.wait()
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, MAIN_COMPONENT_ID, LOG_EVENT_FAILURE, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_FAILURE})
@@ -170,21 +180,23 @@ def simulate(trace_filename=None, error_filename=None):
         # Re-enable the garbage collector.
         gc.enable()
 
-        # The order is important for a graceful shutdown and correct user feedback.
-        
-        # 1. Stop the timer and simulation threads first.
-        if 'timer' in locals() and timer:
+        # The order is important for a graceful shutdown and complete logging.
+        # 1. Stop event sources first to prevent new work.
+        if timer:
             timer.stop()
             timer.wait()
-        if top: # top.wait() is implicitly handled by the loop exit
-            # Terminate hooks (e.g., disconnect pybullet)
+
+        # 2. Wait for the main simulation part to finish its loop, then terminate it.
+        #    top.term() will handle shutting down worker processes.
+        if top:
+            top.wait()
             top.term()
 
-        # 2. Terminate the plot server process if it's still running.
+        # 3. Terminate auxiliary processes.
         if plot_server_process and plot_server_process.is_alive():
             plot_server_process.terminate()
 
-        # 3. Stop the tracer. This is a blocking call that flushes final logs.
+        # 4. Stop the tracer last. This is a blocking call that flushes all final logs.
         if proj_conf.TRACER_ENABLED:
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
