@@ -157,7 +157,6 @@ def simulate(trace_filename=None, error_filename=None):
 
         # If using persistent processes, block until all workers have confirmed they are initialized.
         # This is not needed for 'thread' mode.
-        #if proj_conf.PARALLEL_EXECUTION_MODE == 'process':
         top.wait_for_ready()
 
         # Now that all components are ready, start the timer to begin event flow.
@@ -172,7 +171,13 @@ def simulate(trace_filename=None, error_filename=None):
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_SUCCESS})
 
     except KeyboardInterrupt:
+        # On Ctrl+C, signal all components to stop gracefully.
+        # Do not block here; the finally block will handle waiting.
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
+        if timer:
+            timer.stop()
+        if top:
+            top.stop()
     finally:
         # This block ensures cleanup happens on normal exit or Ctrl+C.
         # Re-enable the garbage collector.
@@ -181,11 +186,10 @@ def simulate(trace_filename=None, error_filename=None):
         # The order is important for a graceful shutdown and complete logging.
         # 1. Stop event sources first to prevent new work.
         if timer:
-            timer.stop()
             timer.wait()
 
         # 2. Wait for the main simulation part to finish its loop, then terminate it.
-        #    top.term() will handle shutting down worker processes.
+        #    top.term() will handle shutting down worker processes or threads.
         if top:
             top.wait()
             top.term()
