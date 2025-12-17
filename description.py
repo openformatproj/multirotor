@@ -80,15 +80,13 @@ class Multirotor(Part):
     interfaces for receiving sensor data from the simulator and providing
     actuator outputs (thrust and torque) back to it.
     """
-
-    def __init__(self, identifier: str, conf: object, controller_execution_strategy: Execution):
+    def __init__(self, identifier: str, conf: object, **kwargs):
         """
         Initializes the Multirotor structural part.
 
         Args:
             identifier (str): The unique name for this part.
             conf (object): The simulation configuration object.
-            controller_execution_strategy: The execution strategy for the controller.
         """
         ports = [
             Port(TIME_PORT, Port.IN),
@@ -100,7 +98,7 @@ class Multirotor(Part):
         parts = {
             SENSORS_ID: Sensors(SENSORS_ID),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, range(1, conf.PROPELLERS + 1), conf=conf, execution_strategy=controller_execution_strategy)
+            CONTROLLER_ID: Controller(CONTROLLER_ID, range(1, conf.PROPELLERS + 1), conf=conf, execution_strategy=Execution.sequential())
         }
         if conf.PLOT:
             parts[PLOTTER_ID] = XYZ_Monitor(
@@ -121,8 +119,7 @@ class Multirotor(Part):
             ports=ports,
             parts=parts,
             scheduling_condition=all_input_ports_updated,
-            conf=conf,
-            controller_execution_strategy=controller_execution_strategy
+            conf=conf
         )
         
         self.connect(self.get_port(TIME_PORT), self.get_part(SENSORS_ID).get_port(TIME_PORT))
@@ -315,17 +312,14 @@ class Top(Part):
     event source. It manages the lifecycle of the PyBullet connection via
     init and term hooks.
     """
-    def __init__(self, identifier: str, conf: object, execution_strategy: Execution, controller_execution_strategy: Execution):
+    def __init__(self, identifier: str, conf: object, execution_strategy: Execution):
         """
         Initializes the Top structural part.
 
         Args:
             identifier (str): The unique name for this part.
             execution_strategy: The strategy for executing inner parts.
-            controller_execution_strategy: The execution strategy for the controller,
-                                           passed down to the Multirotor part.
         """
-
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
             TIME_DIST_ID: EventToDataSynchronizer(
@@ -334,7 +328,7 @@ class Top(Part):
                 output_port_id=TIME_OUT_PORT
             ),
             SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
-            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf, controller_execution_strategy=controller_execution_strategy)
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf)
         }
         super().__init__(
             identifier=identifier,

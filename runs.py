@@ -122,11 +122,9 @@ def simulate(trace_filename=None, error_filename=None):
             error_queue=error_queue
         )
 
-        controller_execution = Execution.sequential()
-
         data.configure(proj_conf)
 
-        top = Top('top', conf=proj_conf, execution_strategy=top_execution, controller_execution_strategy=controller_execution)
+        top = Top('top', conf=proj_conf, execution_strategy=top_execution)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
