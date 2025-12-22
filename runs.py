@@ -171,34 +171,37 @@ def simulate(trace_filename=None, error_filename=None):
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_SUCCESS})
 
     except KeyboardInterrupt:
-        # On Ctrl+C, signal all components to stop gracefully.
-        # Do not block here; the finally block will handle waiting.
+        # On Ctrl+C, log the interrupt and let the finally block handle shutdown.
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
+    finally:
+        # This block ensures cleanup happens on normal exit, Ctrl+C, or any other exception.
+        # It centralizes the entire shutdown sequence for maximum robustness.
+
+        # 1. Signal all running components to stop. This is non-blocking.
         if timer:
             timer.stop()
         if top:
             top.stop()
-    finally:
-        # This block ensures cleanup happens on normal exit or Ctrl+C.
+
         # Re-enable the garbage collector.
         gc.enable()
 
-        # The order is important for a graceful shutdown and complete logging.
-        # 1. Stop event sources first to prevent new work.
+        # 2. Wait for components to finish. The order is important for a graceful shutdown.
+        #    Wait for event sources first to prevent new work.
         if timer:
             timer.wait()
 
-        # 2. Wait for the main simulation part to finish its loop, then terminate it.
-        #    top.term() will handle shutting down worker processes or threads.
+        # 3. Wait for the main simulation part to finish, then terminate it.
+        #    top.term() recursively shuts down all children (threads/processes).
         if top:
             top.wait()
             top.term()
-
-        # 3. Terminate auxiliary processes.
+        
+        # 4. Terminate auxiliary processes.
         if plot_server_process and plot_server_process.is_alive():
             plot_server_process.terminate()
 
-        # 4. Stop the tracer last. This is a blocking call that flushes all final logs.
+        # 5. Stop the tracer last. This is a blocking call that flushes all final logs.
         if proj_conf.TRACER_ENABLED:
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
