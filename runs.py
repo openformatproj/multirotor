@@ -205,6 +205,10 @@ def simulate(trace_filename=None, error_filename=None):
         if proj_conf.TRACER_ENABLED:
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
+            if log_queue:
+                log_queue.cancel_join_thread()
+            if error_queue:
+                error_queue.cancel_join_thread()
 
 def export_diagram(structure_filename=None, part_id=None):
     """
