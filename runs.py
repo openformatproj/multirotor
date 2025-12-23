@@ -109,8 +109,8 @@ def simulate(trace_filename=None, error_filename=None):
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
                 output_file=trace_filename,
-                log_to_console=True,
                 error_file=error_filename,
+                log_to_console=True,
                 log_queue=log_queue,
                 error_queue=error_queue
             )
