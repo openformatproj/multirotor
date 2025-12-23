@@ -293,8 +293,10 @@ def analyze_trace(trace_file: str, output_format: str = 'text', output_file: Opt
         output_format: The desired output format ('text', 'json', 'json:perfetto').
         output_file: Optional path to write the output to.
     """
+    proj_conf = Configuration(conf, sim_conf)
+    
     if not os.path.exists(trace_file):
         print(f"Error: Trace log file not found at '{trace_file}'")
         return
 
-    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file)
+    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file, title = 'multi-process simulation' if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS else 'multi-thread simulation')
