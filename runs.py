@@ -11,7 +11,7 @@ from typing import Optional
 from ml.strategies import Execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log
-from ml.enums import OnFullBehavior, LogLevel
+from ml.enums import OnFullBehavior, LogLevel, ExecutionMode
 from ml import data
 from diagrams.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
@@ -102,7 +102,7 @@ def simulate(trace_filename=None, error_filename=None):
         # Conditionally start the tracer based on configuration
         error_queue = None
         if proj_conf.TRACER_ENABLED:
-            if proj_conf.PARALLEL_EXECUTION_MODE == 'process':
+            if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS:
                 log_queue = multiprocessing.Queue()
                 error_queue = multiprocessing.Queue()
             Tracer.start(
@@ -156,7 +156,7 @@ def simulate(trace_filename=None, error_filename=None):
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
 
         # If using persistent processes, block until all workers have confirmed they are initialized.
-        # This is not needed for 'thread' mode.
+        # This is not needed for ExecutionMode.THREAD.
         top.wait_for_ready()
 
         # Now that all components are ready, start the timer to begin event flow.
