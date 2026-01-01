@@ -10,7 +10,7 @@ from functools import partial
 from typing import Optional
 from ml.strategies import Execution
 from ml.event_sources import Timer
-from ml.tracer import Tracer, analyze_trace_log
+from ml.tracer import Tracer, analyze_trace_log, merge_trace_logs
 from ml.enums import OnFullBehavior, LogLevel, ExecutionMode
 from ml import data
 from diagrams.serializer import DiagramSerializer
@@ -300,3 +300,21 @@ def analyze_trace(trace_file: str, output_format: str = 'text', output_file: Opt
         return
 
     analyze_trace_log(trace_file, output_format=output_format, output_file=output_file, title = 'multi-process simulation' if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS else 'multi-thread simulation')
+
+def merge_traces(trace_file_1: str, trace_file_2: str, output_file: str):
+    """
+    Merges two Perfetto JSON trace files into a single file.
+
+    Args:
+        trace_file_1: Path to the first trace file.
+        trace_file_2: Path to the second trace file.
+        output_file: Path to the output merged trace file.
+    """
+    if not os.path.exists(trace_file_1):
+        print(f"Error: File not found: {trace_file_1}")
+        return
+    if not os.path.exists(trace_file_2):
+        print(f"Error: File not found: {trace_file_2}")
+        return
+
+    merge_trace_logs(trace_file_1, trace_file_2, output_file)
