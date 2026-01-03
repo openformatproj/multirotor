@@ -41,10 +41,10 @@ docker pull openformatproj/multirotor:latest
 docker run -it openformatproj/multirotor:latest
 ```
 
-Once launched, you can execute the `run.py` script from the container:
+Once launched, you can execute the `run.sh` script from the container:
 
 ```text
-/workspaces/multirotor# python run.py simulate
+/workspaces/multirotor# ./run.sh simulate
 ```
 
 This script builds the multirotor architecture, initializes it and starts the simulation timer. The execution should produce the following result:
@@ -63,29 +63,40 @@ A `src/sim_conf.py` file must be available. This is an example:
 
 ```python
 from math import cos, sin
-from ml.data import DECIMAL, FLOAT, NUMPY
+from ml.data import register_data_type, Number
+from ml.enums import ExecutionMode
+from physics_engines import PhysicsEngines
 
 # --- Numerical Backend Configuration ---
-# Sets the numerical computation backend. Options: `NUMPY` (fastest), `FLOAT`, `DECIMAL`.
-NUMBER_IMPLEMENTATION = NUMPY
-# Sets the precision for calculations if `NUMBER_IMPLEMENTATION` is `DECIMAL`.
+register_data_type(Number)
+# Sets the numerical computation backend. Options: `Number.NUMPY` (fastest), `Number.FLOAT`, `Number.DECIMAL`.
+NUMBER_IMPLEMENTATION = Number.NUMPY
+# Sets the precision for calculations if `NUMBER_IMPLEMENTATION` is `Number.DECIMAL`.
 DECIMAL_CONTEXT_PRECISION = 4
+
+# --- Physics Engine Configuration ---
+# Sets the physics engine to use. Options: `PhysicsEngines.PYBULLET`, `PhysicsEngines.MUJOCO`.
+PHYSICS_ENGINE = PhysicsEngines.PYBULLET
 
 # --- Simulation Execution Configuration ---
 # If `True`, the simulation fails if it cannot keep up with the wall-clock time defined by `TIME_STEP`.
 REAL_TIME_SIMULATION = False
 # If `True`, increases the OS process priority to reduce scheduling jitter, crucial for `REAL_TIME_SIMULATION`.
 HIGH_PRIORITY = False
+# Sets how to parallelize parts meant to be executed concurrently (`Rigid_Body_Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`.
+PARALLEL_EXECUTION_MODE = ExecutionMode.THREAD
+# Sets the duration of the simulation in seconds.
+DURATION_SECONDS = 10
 
 # --- Visualization and Debugging ---
 # If `True`, runs the PyBullet simulation with a graphical user interface. `False` runs in headless mode.
-GUI = False
+GUI = True
 # If `True`, enables the real-time `matplotlib` server for plotting position and speed.
-PLOT = True
+PLOT = False
 # A factor to reduce the number of points sent to the plotter (e.g., `10` means 1 out of every 10 points is plotted).
 PLOT_DECIMATION = 10
 # If `True`, activates detailed performance and dataflow logging for analysis.
-TRACER_ENABLED = False
+TRACER_ENABLED = True
 
 # --- Initial State Configuration ---
 # The starting `[x, y, z]` position of the multirotor in the simulation world.
@@ -100,19 +111,21 @@ q = 1.0  # `q`: z angular speed in rad/s
 a = 0.7  # `a`: z amplitude in rad/s
 graph_margin = 1.5
 
-# A function `lambda t: [x, y, z]` that defines the target position of the multirotor over time `t`.
-SET_POSITION = lambda t: [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
-# A function `lambda t: [vx, vy, vz]` that defines the target speed of the multirotor over time `t`.
-SET_SPEED = lambda t: [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
+# A function that defines the target position of the multirotor over time `t`.
+def SET_POSITION(t):
+    return [cos(w * t), sin(w * t), 1 + a * sin(q * t)]
+# A function that defines the target speed of the multirotor over time `t`.
+def SET_SPEED(t):
+    return [w * (-sin(w * t)), w * cos(w * t), a * q * cos(q * t)]
 # Defines the fixed axis limits for the position plot.
 POSITION_GRAPH_BOUNDARIES = [(-1 * graph_margin, 1 * graph_margin), (-1 * graph_margin, 1 * graph_margin), ((1 - a * graph_margin), (1 + a * graph_margin))]
 # Defines the fixed axis limits for the speed plot.
 SPEED_GRAPH_BOUNDARIES = [(-w * graph_margin, w * graph_margin), (-w * graph_margin, w * graph_margin), (-a * q * graph_margin, a * q * graph_margin)]
 ```
 
-In this case, the multirotor is configured to follow a circular trajectory around the origin.
+In this case, the multirotor is configured to follow a circular trajectory around the origin in the XY plane while oscillating along the Z axis.
 
-`src/sim_conf.py` is not tracked by Git, allowing you to customize simulation parameters without modifying the core configuration.
+`src/sim_conf.py` is not tracked by Git, allowing you to customize simulation parameters without modifying the core configuration. However, you must add it manually.
 
 # Overview
 
@@ -131,7 +144,9 @@ Here's a snippet of how the environment is built at the code level (`src/descrip
 # Import dependencies
 
 class Multirotor(Part):
-    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution):
+
+    def __init__(self, identifier: str, conf: object):
+        conf.propeller_indexes = PROPELLERS_INDEXES(conf)
         ports = [
             Port(TIME_PORT, Port.IN),
             Port(POSITION_PORT, Port.IN),
@@ -140,46 +155,54 @@ class Multirotor(Part):
             Port(ANGULAR_SPEED_PORT, Port.IN)
         ]
         parts = {
-            SENSORS_ID: Sensors(SENSORS_ID),
+            SENSORS_ID: Sensors(SENSORS_ID, conf),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, PROPELLERS_INDEXES, conf=conf, execution_strategy=execution_strategy)
+            CONTROLLER_ID: Controller(CONTROLLER_ID, conf)
         }
-        for i in PROPELLERS_INDEXES:
+        for i in PROPELLERS_INDEXES(conf):
             ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
             ports.append(Port(TORQUE_PORT_TPL.format(i), Port.OUT))
-            parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i))
-            direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
-            parts[PROPELLER_ID_TPL.format(i)] = Propeller(PROPELLER_ID_TPL.format(i), direction)
+            parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i), conf)
+            conf.direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
+            parts[PROPELLER_ID_TPL.format(i)] = Propeller(PROPELLER_ID_TPL.format(i), conf)
             
         super().__init__(
             identifier=identifier,
-            execution_strategy=sequential_execution,
+            execution_strategy=Execution.sequential(),
             ports=ports,
             parts=parts,
+            scheduling_condition=all_input_ports_updated,
             conf=conf
         )
-        
+
         # Connect time, position, orientation, etc. to inner parts
 
 class Rigid_Body_Simulator(Part):
-    # Initialize the simulator with a PyBullet engine instance
 
     def behavior(self):
+        if not self.engine or not self.engine.is_connected():
+            raise RuntimeError(ERR_ENGINE_NOT_CONNECTED)
         if all(p.is_updated() for p in self.thrust_ports) and all(p.is_updated() for p in self.torque_ports):
             for i, (thrust_port, torque_port) in enumerate(zip(self.thrust_ports, self.torque_ports)):
-                thrust = thrust_port.get()
-                torque = torque_port.get()
-                self.engine.applyExternalForce(self.multirotor_avatar, i, thrust, [0, 0, 0], self.engine.LINK_FRAME)
-                self.engine.applyExternalTorque(self.multirotor_avatar, i, torque, self.engine.LINK_FRAME)
+                thrust = float(thrust_port.get())
+                torque = float(torque_port.get())
+                self.engine.set_force(i, thrust)
+                self.engine.set_torque(i, torque)
+            
+            self.engine.step()
 
-            self.engine.stepSimulation()
-
-        position, orientation = self.engine.getBasePositionAndOrientation(self.multirotor_avatar)
+        position, orientation = self.engine.get_zero_order_state()
         self.get_port(MULTIROTOR_POSITION_PORT).set(position)
         self.get_port(MULTIROTOR_ORIENTATION_PORT).set(orientation)
-        linear_speed, angular_speed = self.engine.getBaseVelocity(self.multirotor_avatar)
+        linear_speed, angular_speed = self.engine.get_first_order_state()
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
+
+    def init(self):
+        self.engine.init()
+
+    def term(self):
+        self.engine.term()
 
     def __init__(self, identifier: str, conf: object):
         ports = [
@@ -189,20 +212,20 @@ class Rigid_Body_Simulator(Part):
             Port(MULTIROTOR_LINEAR_SPEED_PORT, Port.OUT),
             Port(MULTIROTOR_ANGULAR_SPEED_PORT, Port.OUT)
         ]
-        for i in PROPELLERS_INDEXES:
+        propellers_indexes = PROPELLERS_INDEXES(conf)
+        for i in propellers_indexes:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
-        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=lambda part: part.get_port(TIME_PORT).is_updated())
-        self.engine = None
-        self.multirotor_avatar = None
-        self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
-        self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in PROPELLERS_INDEXES]
+        super().__init__(identifier=identifier, ports=ports, conf=conf, scheduling_condition=time_updated)
+        self.engine = get_physics_engine(conf)
+        self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in propellers_indexes]
+        self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in propellers_indexes]
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, Rigid_Body_Simulator.init)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, Rigid_Body_Simulator.term)
 
 class Top(Part):
-    # Define an initialization hook that connects to the PyBullet physics engine and a termination hook to disconnect
 
-    def __init__(self, identifier: str, conf: object, execution_strategy=sequential_execution, controller_execution_strategy=sequential_execution):
-        self.engine = None
+    def __init__(self, identifier: str, conf: object, log_queue=None, error_queue=None):
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
             TIME_DIST_ID: EventToDataSynchronizer(
@@ -210,9 +233,15 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
-            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, execution_strategy=controller_execution_strategy)
+            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf),
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
+        execution_strategy = Execution(name='parallel_multirotor_execution',
+            parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
+            mode=conf.PARALLEL_EXECUTION_MODE,
+            log_queue=log_queue,
+            error_queue=error_queue
+        )
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,
@@ -228,8 +257,6 @@ class Top(Part):
         self.connect_event_queue(self.get_event_queue(TIME_EVENT_IN_Q), time_dist.get_event_queue(TIME_EVENT_IN_Q))
         
         # Connect time, position, orientation, etc. to simulator and multirotor
-
-        # Add hooks to self
 ```
 
 As it's possible to understand, `class Multirotor` defines its ports, the parts it's composed of (motors, propellers, sensors, the trajectory_planner and the controller) and their connections. All these parts are further defined in their specific subfolders, such as `./motor`, `./propeller`, and so on. This kind of description is called *structural* and allows building hierarchies. `class Rigid_Body_Simulator` provides instead an example of *behavioral* description:
@@ -237,27 +264,32 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 * Whenever time port is updated, position, orientation and their derivatives are extracted from the simulation environment (specifically, from the multirotor avatar) and sent on output ports.
 * When, moreover, thrusts and torques are updated by the multirotor model, they are applied to the avatar and the simulation engine is stepped.
 
-`class Top` finally aggregates the simulator and the multirotor model. It is driven by an external `Timer` (an `EventSource`) that provides time events. This allows running a "real time" simulation, provided that all computations are able to terminate within the timer's period. To perform the simulation, one can instantiate these components and run them in separate threads.
-The `Timer`'s `on_full` policy is critical. Using `OnFullBehavior.FAIL` (as shown below) enforces strict real-time execution by stopping the simulation if a deadline is missed. This is the recommended mode for validating system performance. The alternative, `OnFullBehavior.OVERWRITE`, allows the simulation to continue by dropping events, which can be useful for non-critical analysis.
+`class Top` finally aggregates the simulator and the multirotor model. It is driven by an external `Timer` (an `EventSource`) that provides time events. This allows running a "real time" simulation, provided that all computations are able to terminate within the timer's period. To perform the simulation, one can instantiate these components and run them in separate threads (`src/runs.py`):
 
 ```python
-top = Top('top', execution_strategy=parallel_toplevel_execution, controller_execution_strategy=parallel_controller_execution)
-top.init()
+def simulate():
 
-on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior)
+    proj_conf = Configuration(conf, sim_conf)
+    data.configure(proj_conf)
+    top = Top('top', conf=proj_conf, log_queue=None, error_queue=None)
+    top.init()
 
-top.connect_event_source(timer, 'time_event_in')
+    on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
+    timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=conf.DURATION_SECONDS)
 
-top.start(stop_condition=lambda p: timer.stop_event_is_set())
-timer.start()
-top.wait()
-timer.stop()
-timer.wait()
-top.term()
+    event_queues = top.get_event_queues()
+    top.connect_event_source(timer, event_queues[0].get_identifier())
+
+    top.start(stop_condition=lambda p: timer.stop_event_is_set())
+    top.wait_for_ready()
+    timer.start()
+    top.wait()
+    top.term()
 ```
 
-This is exactly what the script `run.py` available in the Docker image does by calling the function `simulate()` in `src/runs.py`.
+This is exactly what the script `run.sh` available in the Docker image does by calling the function `simulate()` in `src/runs.py`.
+
+The `Timer`'s `on_full` policy is critical. Using `OnFullBehavior.FAIL` enforces strict real-time execution by stopping the simulation if a deadline is missed. This is the recommended mode for validating system performance. The alternative, `OnFullBehavior.DROP`, allows the simulation to continue by dropping events, which can be useful for non-critical analysis.
 
 For more information about the ml engine, read the [documentation](https://openformatproj.github.io/ml-docs/).
 

@@ -2,12 +2,10 @@ import socket
 import json
 import os
 import sys
-import time
 from PyQt5.QtWidgets import QApplication
 import signal
-from PyQt5.QtCore import QTimer
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+# from matplotlib.animation import FFMpegWriter
 from . import conf as monitor_conf
 
 # --- Constants ---
@@ -116,6 +114,9 @@ class RealTimePlotter:
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
+        # self.writer = FFMpegWriter(fps=30)
+        # self.writer.setup(self.fig, "2.mp4", dpi=100)
+
     def update_data(self, new_data):
         for key, value in new_data.items():
             if key in self.data:
@@ -136,6 +137,7 @@ class RealTimePlotter:
 
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
+        # self.writer.grab_frame()
 
 def main(position_bounds=None, speed_bounds=None):
     # Ignore SIGINT in the child process. The parent process will handle shutdown.
@@ -187,6 +189,7 @@ def main(position_bounds=None, speed_bounds=None):
                     break
 
     print(MSG_SERVER_SHUTDOWN)
+    # plotter.writer.finish()
     plt.close('all')
 
 if __name__ == '__main__':

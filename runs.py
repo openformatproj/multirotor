@@ -4,16 +4,14 @@ import sys
 import json
 import gc
 import platform
-import threading
 import time
 import multiprocessing
 from functools import partial
 from typing import Optional
-from PyQt5.QtWidgets import QApplication
-from ml.strategies import sequential_execution, execute
 from ml.event_sources import Timer
-from ml.tracer import Tracer, analyze_trace_log
-from ml.enums import OnFullBehavior, LogLevel
+from ml.tracer import Tracer, analyze_trace_log, merge_trace_logs
+from ml.enums import OnFullBehavior, LogLevel, ExecutionMode
+from ml import data
 from diagrams.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
 from diagrams.optimization import run_simulated_annealing
@@ -21,6 +19,7 @@ from datetime import datetime
 from monitor.plot_server import main as run_plot_server
 from description import Top
 import conf
+import types
 import sim_conf
 
 class Configuration:
@@ -31,7 +30,11 @@ class Configuration:
             # Load all variables from the conf module into this object
             for key, value in vars(configuration).items():
                 if not key.startswith('__'):
-                    setattr(self, key, value)
+                    # Only copy attributes that are not modules or functions, as they are unpicklable.
+                    # This prevents multiprocessing errors when passing the configuration.
+                    is_module = isinstance(value, types.ModuleType)
+                    if not is_module:
+                        setattr(self, key, value)
 
 # --- Log constants ---
 MAIN_COMPONENT_ID = "MAIN"
@@ -57,73 +60,6 @@ MSG_DIAG_FILE_NOT_FOUND = "Error: JSON file '{}' not found. Please run with 'exp
 MSG_DIAG_LOADING = "Loading diagram from '{}'..."
 MSG_DIAG_IMPORT_SUCCESS = "Diagram imported successfully."
 MSG_DIAG_IMPORT_ERROR = "Error importing diagram: {}"
-def parallel_controller_execution(parent_part, scheduled_parts, strategy_event):
-    """
-    A custom execution strategy that runs the 'atas' mixer and all PID-based
-    'Control_Element' parts in separate threads, while executing any other
-    parts sequentially. This parallelizes the main computational load of the
-    controller.
-    """
-    parallelizable_parts = []
-    sequential_parts = []
-    threads = []
-
-    # Separate the parts that can be run in parallel from the others
-    for part in scheduled_parts:
-        part_id = part.get_identifier()
-        if part_id == 'atas' or 'control_element' in part_id:
-            parallelizable_parts.append(part)
-        else:
-            sequential_parts.append(part)
-
-    creator_thread_name = threading.current_thread().name
-
-    # Start each parallelizable part in its own thread
-    for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
-        thread.start()
-        threads.append(thread)
-
-    # Execute the rest of the parts sequentially in the main thread while parallel threads run
-    if sequential_parts:
-        sequential_execution(parent_part, sequential_parts, strategy_event)
-
-    # Wait for all parallel threads to finish before the strategy returns
-    for thread in threads:
-        thread.join()
-
-
-def parallel_toplevel_execution(parent_part, scheduled_parts, strategy_event):
-    """
-    A custom execution strategy that runs the main 'simulator' and 'multirotor'
-    parts in parallel threads, as they are the main computational loads and
-    are independent within a single step. Any other parts are run sequentially.
-    """
-    parallelizable_parts = []
-    sequential_parts = []
-    threads = []
-
-    # Separate the parts that can be run in parallel
-    for part in scheduled_parts:
-        part_id = part.get_identifier()
-        if part_id in ['simulator', 'multirotor']:
-            parallelizable_parts.append(part)
-        else:
-            sequential_parts.append(part)
-
-    creator_thread_name = threading.current_thread().name
-
-    for part in parallelizable_parts:
-        thread = threading.Thread(target=execute, args=(part, creator_thread_name, strategy_event, parent_part.tick), name=f"{part.get_full_identifier()}_thread")
-        thread.start()
-        threads.append(thread)
-
-    # Execute sequential parts (if any) in the main thread while parallel threads run
-    if sequential_parts:
-        sequential_execution(parent_part, sequential_parts, strategy_event)
-
-    for thread in threads:
-        thread.join()
 
 def set_high_priority():
     """
@@ -148,6 +84,7 @@ def simulate(trace_filename=None, error_filename=None):
 
     plot_server_process = None
     top = None
+    timer = None
     try:
         if proj_conf.PLOT:
             print(MSG_PLOT_SERVER_STARTING)
@@ -160,17 +97,26 @@ def simulate(trace_filename=None, error_filename=None):
             # Wait a moment for the server to initialize and start listening
             time.sleep(1.5)
 
+        log_queue = None
+        error_queue = None
         # Conditionally start the tracer based on configuration
         if proj_conf.TRACER_ENABLED:
+            if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS:
+                log_queue = multiprocessing.Queue()
+                error_queue = multiprocessing.Queue()
             Tracer.start(
                 level=LogLevel.TRACE,
                 flush_interval_seconds=5.0,
                 output_file=trace_filename,
+                error_file=error_filename,
                 log_to_console=True,
-                error_file=error_filename
+                log_queue=log_queue,
+                error_queue=error_queue
             )
 
-        top = Top('top', conf=proj_conf, execution_strategy=parallel_toplevel_execution, controller_execution_strategy=sequential_execution)
+        data.configure(proj_conf)
+
+        top = Top('top', conf=proj_conf, log_queue=log_queue, error_queue=error_queue)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -182,10 +128,11 @@ def simulate(trace_filename=None, error_filename=None):
         # In non-real-time mode (`DROP`), it drops events to keep running,
         # which can be useful for non-critical runs or debugging.
         on_full_behavior = OnFullBehavior.FAIL if proj_conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-        timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior)
+        timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=proj_conf.DURATION_SECONDS)
 
         # Connect the timer to the simulation's main event queue
-        top.connect_event_source(timer, 'time_event_in')
+        event_queues = top.get_event_queues()
+        top.connect_event_source(timer, event_queues[0].get_identifier())
 
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_START, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_START.format(datetime.now())})
         
@@ -198,10 +145,19 @@ def simulate(trace_filename=None, error_filename=None):
         if proj_conf.HIGH_PRIORITY:
             set_high_priority()
         
+        # Start the simulation thread, which will spawn worker processes.
         top.start(stop_condition=lambda _: timer.stop_event_is_set())
+
+        # If using persistent processes, block until all workers have confirmed they are initialized.
+        # This is not needed for ExecutionMode.THREAD.
+        top.wait_for_ready()
+
+        # Now that all components are ready, start the timer to begin event flow.
         timer.start()
 
-        top.wait() # Block until the simulation ends
+        # Block here and wait for the main simulation thread to finish.
+        top.wait()
+        top.term()
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, MAIN_COMPONENT_ID, LOG_EVENT_FAILURE, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_FAILURE})
@@ -209,30 +165,44 @@ def simulate(trace_filename=None, error_filename=None):
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_SUCCESS})
 
     except KeyboardInterrupt:
+        # On Ctrl+C, log the interrupt and let the finally block handle shutdown.
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_INTERRUPT, {LOG_DETAIL_KEY_MESSAGE: MSG_INTERRUPT})
     finally:
-        # This block ensures cleanup happens on normal exit or Ctrl+C.
+        # This block ensures cleanup happens on normal exit, Ctrl+C, or any other exception.
+        # It centralizes the entire shutdown sequence for maximum robustness.
+
+        # 1. Signal all running components to stop. This is non-blocking.
+        if timer:
+            timer.stop()
+        if top:
+            top.stop()
+
         # Re-enable the garbage collector.
         gc.enable()
 
-        # The order is important for a graceful shutdown and correct user feedback.
-        
-        # 1. Stop the timer and simulation threads first.
-        if 'timer' in locals() and timer:
-            timer.stop()
+        # 2. Wait for components to finish. The order is important for a graceful shutdown.
+        #    Wait for event sources first to prevent new work.
+        if timer:
             timer.wait()
-        if top: # top.wait() is implicitly handled by the loop exit
-            # Terminate hooks (e.g., disconnect pybullet)
-            top.term()
 
-        # 2. Terminate the plot server process if it's still running.
+        # 3. Wait for the main simulation part to finish, then terminate it.
+        #    top.term() recursively shuts down all children (threads/processes).
+        if top:
+            top.wait()
+            top.term()
+        
+        # 4. Terminate auxiliary processes.
         if plot_server_process and plot_server_process.is_alive():
             plot_server_process.terminate()
 
-        # 3. Stop the tracer. This is a blocking call that flushes final logs.
+        # 5. Stop the tracer last. This is a blocking call that flushes all final logs.
         if proj_conf.TRACER_ENABLED:
             Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_SUCCESS, {LOG_DETAIL_KEY_MESSAGE: MSG_SHUTDOWN_COMPLETE})
             Tracer.stop()
+            if log_queue:
+                log_queue.cancel_join_thread()
+            if error_queue:
+                error_queue.cancel_join_thread()
 
 def export_diagram(structure_filename=None, part_id=None):
     """
@@ -274,6 +244,7 @@ def import_diagram(structure_filename=None):
         return
 
     print(MSG_DIAG_LOADING.format(structure_filename))
+    from PyQt5.QtWidgets import QApplication
     with open(structure_filename, 'r') as f:
         json_data = f.read()
 
@@ -316,8 +287,28 @@ def analyze_trace(trace_file: str, output_format: str = 'text', output_file: Opt
         output_format: The desired output format ('text', 'json', 'json:perfetto').
         output_file: Optional path to write the output to.
     """
+    proj_conf = Configuration(conf, sim_conf)
+    
     if not os.path.exists(trace_file):
         print(f"Error: Trace log file not found at '{trace_file}'")
         return
 
-    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file)
+    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file, title = 'multi-process simulation' if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS else 'multi-thread simulation')
+
+def merge_traces(trace_file_1: str, trace_file_2: str, output_file: str):
+    """
+    Merges two Perfetto JSON trace files into a single file.
+
+    Args:
+        trace_file_1: Path to the first trace file.
+        trace_file_2: Path to the second trace file.
+        output_file: Path to the output merged trace file.
+    """
+    if not os.path.exists(trace_file_1):
+        print(f"Error: File not found: {trace_file_1}")
+        return
+    if not os.path.exists(trace_file_2):
+        print(f"Error: File not found: {trace_file_2}")
+        return
+
+    merge_trace_logs(trace_file_1, trace_file_2, output_file)

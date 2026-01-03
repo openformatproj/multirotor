@@ -49,12 +49,13 @@ class Sensors(Part):
         self.get_port('z').set(Number(position_raw[Z.index()]))
         self.get_port('z_speed').set(Number(linear_speed_raw[Z.index()]))
 
-    def __init__(self, identifier):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Sensors part.
 
         Args:
             identifier (str): The unique name for this part.
+            conf (object): The simulation configuration object.
         """
         ports = [
             Port('time', Port.IN),

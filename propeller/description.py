@@ -46,14 +46,13 @@ class Propeller(Part):
         thrust = Propeller.thrust(self.get_port('angular_speed').get(), self.direction)
         self.get_port('thrust').set(thrust)
 
-    def __init__(self, identifier: str, direction: int):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Propeller part.
 
         Args:
             identifier (str): The unique name for this part.
-            direction (int): The rotational direction, either Propeller.RIGHT_HANDED
-                             or Propeller.LEFT_HANDED.
+            conf (object): The simulation configuration object.
         """
         ports = [
             Port('time', Port.IN),
@@ -66,4 +65,4 @@ class Propeller(Part):
             # This part should only run when all its inputs are ready.
             scheduling_condition=all_input_ports_updated
         )
-        self.direction = direction
+        self.direction = conf.direction

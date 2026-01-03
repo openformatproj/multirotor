@@ -1,5 +1,5 @@
 from ml.engine import Part, Port
-from ml.strategies import sequential_execution, all_input_ports_updated
+from ml.strategies import Execution, all_input_ports_updated
 from ml.data import Number
 from ml.parts import Operator
 from ml import conf as ml_conf
@@ -16,13 +16,13 @@ class Trajectory_Planner(Part):
     `speed_out = Kp * (target_pos - current_pos) + target_speed`
     """
 
-    def __init__(self, identifier, conf: object):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Trajectory_Planner structural part.
 
         Args:
             identifier (str): The unique name for this part.
-            conf: The simulation configuration object.
+            conf (object): The simulation configuration object.
         """
         # Proportional gains for the position controller.
         self.KP_HORIZONTAL = Number('0.7')
@@ -71,7 +71,7 @@ class Trajectory_Planner(Part):
             identifier=identifier,
             ports=ports,
             parts=parts,
-            execution_strategy=sequential_execution,
+            execution_strategy=Execution.sequential(),
             scheduling_condition=all_input_ports_updated,
             conf=conf
         )
