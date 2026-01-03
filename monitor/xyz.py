@@ -25,15 +25,13 @@ class XYZ_Monitor(Part):
     serializes it into JSON, and sends it over a TCP socket to a server
     responsible for visualization.
     """
-    def __init__(self, identifier: str, plot_decimation: int, host: str = monitor_conf.DEFAULT_HOST, port: int = monitor_conf.DEFAULT_PORT):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the XYZ_Monitor client.
 
         Args:
             identifier (str): The unique name for this part.
-            plot_decimation (int): Send data only every Nth call to reduce network traffic.
-            host (str): The hostname or IP address of the plotting server.
-            port (int): The port number of the plotting server.
+            conf (object): The simulation configuration object.
         """
         ports = [
             Port('time', Port.IN),
@@ -42,9 +40,7 @@ class XYZ_Monitor(Part):
         ]
         super().__init__(identifier, ports=ports, scheduling_condition=time_updated)
 
-        self.host = host
-        self.port = port
-        self.plot_decimation = plot_decimation
+        self.plot_decimation = conf.PLOT_DECIMATION
         self.tick_counter = 0
         self.socket = None
 
@@ -54,8 +50,8 @@ class XYZ_Monitor(Part):
     def _connect_to_server(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.host, self.port))
-            Tracer.log(LogLevel.INFO, self.get_identifier(), LOG_EVENT_CONNECT, {LOG_DETAIL_KEY_HOST: self.host, LOG_DETAIL_KEY_PORT: self.port})
+            self.socket.connect((monitor_conf.DEFAULT_HOST, monitor_conf.DEFAULT_PORT))
+            Tracer.log(LogLevel.INFO, self.get_identifier(), LOG_EVENT_CONNECT, {LOG_DETAIL_KEY_HOST: monitor_conf.DEFAULT_HOST, LOG_DETAIL_KEY_PORT: monitor_conf.DEFAULT_PORT})
         except ConnectionRefusedError:
             Tracer.log(LogLevel.ERROR, self.get_identifier(), LOG_EVENT_CONNECT_FAIL, {LOG_DETAIL_KEY_MESSAGE: MSG_CONNECTION_REFUSED})
             self.socket = None # Ensure socket is None on failure

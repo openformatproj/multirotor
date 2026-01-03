@@ -13,7 +13,6 @@ from controller.description import Controller
 from monitor.xyz import XYZ_Monitor
 from constants import X, Y, Z
 
-
 # --- Component Identifiers ---
 SENSORS_ID = 'sensors'
 TRAJECTORY_PLANNER_ID = 'trajectory_planner'
@@ -55,9 +54,8 @@ MULTIROTOR_TORQUE_PORT_TPL = 'multirotor_torque_{}'
 TIME_OUT_PORT = 'time_out'
 TIME_EVENT_IN_Q = 'time_event_in'
 
-# --- Log constants ---
-LOG_EVENT_STEP = "STEP"
-LOG_DETAIL_KEY_CONNECTED = "connected"
+# --- Other ---
+PROPELLERS_INDEXES = lambda conf : range(1, conf.PROPELLERS + 1)
 
 class Multirotor(Part):
     """
@@ -69,7 +67,7 @@ class Multirotor(Part):
     interfaces for receiving sensor data from the simulator and providing
     actuator outputs (thrust and torque) back to it.
     """
-    def __init__(self, identifier: str, conf: object, **kwargs):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Multirotor structural part.
 
@@ -77,6 +75,7 @@ class Multirotor(Part):
             identifier (str): The unique name for this part.
             conf (object): The simulation configuration object.
         """
+        conf.propeller_indexes = PROPELLERS_INDEXES(conf)
         ports = [
             Port(TIME_PORT, Port.IN),
             Port(POSITION_PORT, Port.IN),
@@ -85,22 +84,19 @@ class Multirotor(Part):
             Port(ANGULAR_SPEED_PORT, Port.IN)
         ]
         parts = {
-            SENSORS_ID: Sensors(SENSORS_ID),
+            SENSORS_ID: Sensors(SENSORS_ID, conf),
             TRAJECTORY_PLANNER_ID: Trajectory_Planner(TRAJECTORY_PLANNER_ID, conf),
-            CONTROLLER_ID: Controller(CONTROLLER_ID, range(1, conf.PROPELLERS + 1), conf=conf, execution_strategy=Execution.sequential())
+            CONTROLLER_ID: Controller(CONTROLLER_ID, conf)
         }
         if conf.PLOT:
-            parts[PLOTTER_ID] = XYZ_Monitor(
-                PLOTTER_ID,
-                plot_decimation=conf.PLOT_DECIMATION
-            )
+            parts[PLOTTER_ID] = XYZ_Monitor(PLOTTER_ID, plot_decimation=conf.PLOT_DECIMATION)
 
-        for i in range(1, conf.PROPELLERS + 1):
+        for i in PROPELLERS_INDEXES(conf):
             ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
             ports.append(Port(TORQUE_PORT_TPL.format(i), Port.OUT))
-            parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i))
-            direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
-            parts[PROPELLER_ID_TPL.format(i)] = Propeller(PROPELLER_ID_TPL.format(i), direction)
+            parts[MOTOR_ID_TPL.format(i)] = Motor(MOTOR_ID_TPL.format(i), conf)
+            conf.direction = Propeller.LEFT_HANDED if i in [2, 4] else Propeller.RIGHT_HANDED
+            parts[PROPELLER_ID_TPL.format(i)] = Propeller(PROPELLER_ID_TPL.format(i), conf)
             
         super().__init__(
             identifier=identifier,
@@ -129,7 +125,7 @@ class Multirotor(Part):
             self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_SETPOINT_PORT_TPL.format(i.name())))
             self.connect(self.get_part(SENSORS_ID).get_port(SPEED_PORT_TPL.format(i.name())), self.get_part(CONTROLLER_ID).get_port(SPEED_PORT_TPL.format(i.name())))
         self.connect(self.get_part(TRAJECTORY_PLANNER_ID).get_port(YAW_SPEED_PORT), self.get_part(CONTROLLER_ID).get_port(YAW_SPEED_SETPOINT_PORT))
-        for i in range(1, conf.PROPELLERS + 1):
+        for i in PROPELLERS_INDEXES(conf):
             self.connect(self.get_port(TIME_PORT), self.get_part(PROPELLER_ID_TPL.format(i)).get_port(TIME_PORT))
             self.connect(self.get_port(TIME_PORT), self.get_part(MOTOR_ID_TPL.format(i)).get_port(TIME_PORT))
             self.connect(self.get_part(CONTROLLER_ID).get_port(ANGULAR_SPEED_PORT_TPL.format(i)), self.get_part(MOTOR_ID_TPL.format(i)).get_port(ANGULAR_SPEED_IN_PORT))
@@ -182,7 +178,7 @@ class Rigid_Body_Simulator(Part):
                 self.engine.set_force(i, thrust)
                 self.engine.set_torque(i, torque)
             
-            #self.engine.write_inputs()
+            #self.engine.write_log_inputs()
             # Only step the simulation after new forces have been applied.
             self.engine.step()
 
@@ -193,7 +189,7 @@ class Rigid_Body_Simulator(Part):
         linear_speed, angular_speed = self.engine.get_first_order_state()
         self.get_port(MULTIROTOR_LINEAR_SPEED_PORT).set(linear_speed)
         self.get_port(MULTIROTOR_ANGULAR_SPEED_PORT).set(angular_speed)
-        #self.engine.write_state(position, orientation, linear_speed, angular_speed)
+        #self.engine.write_log_outputs(position, orientation, linear_speed, angular_speed)
 
     def init(self):
         self.engine.init()
@@ -218,7 +214,7 @@ class Rigid_Body_Simulator(Part):
             Port(MULTIROTOR_LINEAR_SPEED_PORT, Port.OUT),
             Port(MULTIROTOR_ANGULAR_SPEED_PORT, Port.OUT)
         ]
-        propellers_indexes = range(1, conf.PROPELLERS + 1)
+        propellers_indexes = PROPELLERS_INDEXES(conf)
         for i in propellers_indexes:
             ports.append(Port(MULTIROTOR_THRUST_PORT_TPL.format(i), Port.IN))
             ports.append(Port(MULTIROTOR_TORQUE_PORT_TPL.format(i), Port.IN))
@@ -239,13 +235,15 @@ class Top(Part):
     all components with a single time signal, driven by an external `Timer`
     event source.
     """
-    def __init__(self, identifier: str, conf: object, execution_strategy: Execution):
+    def __init__(self, identifier: str, conf: object, log_queue=None, error_queue=None):
         """
         Initializes the Top structural part.
 
         Args:
             identifier (str): The unique name for this part.
-            execution_strategy: The strategy for executing inner parts.
+            conf (object): The simulation configuration object.
+            log_queue (multiprocessing.Queue, optional): Queue for logging in multiprocess execution.
+            error_queue (multiprocessing.Queue, optional): Queue for error reporting in multiprocess execution.
         """
         event_queues = [EventQueue(TIME_EVENT_IN_Q, EventQueue.IN, size=1)]
         parts = {
@@ -254,9 +252,15 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf=conf),
-            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf=conf)
+            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf),
+            MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
+        execution_strategy = Execution(name='parallel_multirotor_execution',
+            parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
+            mode=conf.PARALLEL_EXECUTION_MODE,
+            log_queue=log_queue,
+            error_queue=error_queue
+        )
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,
@@ -279,6 +283,6 @@ class Top(Part):
         self.connect(simulator.get_port(MULTIROTOR_ORIENTATION_PORT), multirotor.get_port(ORIENTATION_PORT))
         self.connect(simulator.get_port(MULTIROTOR_LINEAR_SPEED_PORT), multirotor.get_port(LINEAR_SPEED_PORT))
         self.connect(simulator.get_port(MULTIROTOR_ANGULAR_SPEED_PORT), multirotor.get_port(ANGULAR_SPEED_PORT))
-        for i in range(1, conf.PROPELLERS + 1):
+        for i in PROPELLERS_INDEXES(conf):
             self.connect(multirotor.get_port(THRUST_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)))
             self.connect(multirotor.get_port(TORQUE_PORT_TPL.format(i)), simulator.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)))

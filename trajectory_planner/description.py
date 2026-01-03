@@ -16,13 +16,13 @@ class Trajectory_Planner(Part):
     `speed_out = Kp * (target_pos - current_pos) + target_speed`
     """
 
-    def __init__(self, identifier, conf: object):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Trajectory_Planner structural part.
 
         Args:
             identifier (str): The unique name for this part.
-            conf: The simulation configuration object.
+            conf (object): The simulation configuration object.
         """
         # Proportional gains for the position controller.
         self.KP_HORIZONTAL = Number('0.7')

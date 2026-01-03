@@ -43,12 +43,13 @@ class Motor(Part):
         self.get_port('angular_speed_out').set(angular_speed)
         self.get_port('reaction_torque').set(reaction_torque)
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, conf: object):
         """
         Initializes the Motor part.
 
         Args:
             identifier (str): The unique name for this part.
+            conf (object): The simulation configuration object.
         """
         ports = [
             Port('time', Port.IN),

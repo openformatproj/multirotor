@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import os
 import math
-import re
 import numpy as np
 from services import generate_urdf_model
 from world.services import generate_world
@@ -20,17 +19,21 @@ ERR_ENGINE_NOT_CONNECTED = "Physics engine not connected."
 ERR_ENGINE_STEP_FAILED = "Physical simulation step failed."
 ERR_ENGINE_CONNECT_FAILED = "Failed to connect to physics engine in '{}' mode."
 ERR_ENGINE_CONNECT_NO_EXCEPTION = "Physics engine connection failed without exception."
+ERR_ENGINE_UNKNOWN = "Unknown physics engine: {}"
+
+LOGS_PATH = 'logs'
 
 class SimulatorEngine(ABC):
-    def __init__(self, conf, f_thrust_path, f_state_path):
+    def __init__(self, conf, engine_inputs_path, engine_outputs_path):
         self.backend = None
         self.conf = conf
+        self.name = None
         self.sim_time = 0.0
         self.input_log_buffer = {}
-        self.f_thrust = None
-        self.f_state = None
-        self.f_thrust_path = f_thrust_path
-        self.f_state_path = f_state_path
+        self.engine_inputs = None
+        self.engine_outputs = None
+        self.engine_inputs_path = engine_inputs_path
+        self.engine_outputs_path = engine_outputs_path
 
     @abstractmethod
     def init(self): pass
@@ -57,38 +60,42 @@ class SimulatorEngine(ABC):
     def get_first_order_state(self): pass
 
     def init_logs(self):
-        if not os.path.exists('logs'):
-            os.makedirs('logs')
-        self.f_thrust = open(self.f_thrust_path, 'w')
-        self.f_thrust.write('time,thrust_1,torque_1,thrust_2,torque_2,thrust_3,torque_3,thrust_4,torque_4\n')
+        if not os.path.exists(LOGS_PATH):
+            os.makedirs(LOGS_PATH)
+        self.engine_inputs = open(self.engine_inputs_path, 'w')
+        self.engine_inputs.write('time,thrust_1,torque_1,thrust_2,torque_2,thrust_3,torque_3,thrust_4,torque_4\n')
         
-        self.f_state = open(self.f_state_path, 'w')
-        self.f_state.write('time,x,y,z,roll,pitch,yaw,vx,vy,vz,wx,wy,wz\n')
+        self.engine_outputs = open(self.engine_outputs_path, 'w')
+        self.engine_outputs.write('time,x,y,z,roll,pitch,yaw,vx,vy,vz,wx,wy,wz\n')
 
     def term_logs(self):
-        if self.f_thrust: self.f_thrust.close()
-        if self.f_state: self.f_state.close()
+        if self.engine_inputs: self.engine_inputs.close()
+        if self.engine_outputs: self.engine_outputs.close()
 
     def log_input(self, index, key, value):
         if index not in self.input_log_buffer:
             self.input_log_buffer[index] = {}
         self.input_log_buffer[index][key] = value
 
-    def write_inputs(self):
-        if self.f_thrust:
+    def write_log_inputs(self):
+        if self.engine_inputs:
             line = f"{self.sim_time}"
             for i in range(self.conf.PROPELLERS):
                 vals = self.input_log_buffer.get(i, {})
                 line += f",{vals.get('thrust', 0.0)},{vals.get('torque', 0.0)}"
-            self.f_thrust.write(line + "\n")
+            self.engine_inputs.write(line + "\n")
             self.input_log_buffer.clear()
 
-    def write_state(self, pos, rot, lin, ang):
-        if self.f_state:
+    def write_log_outputs(self, pos, rot, lin, ang):
+        if self.engine_outputs:
             line = f"{self.sim_time},{pos[0]},{pos[1]},{pos[2]},{rot[0]},{rot[1]},{rot[2]},{lin[0]},{lin[1]},{lin[2]},{ang[0]},{ang[1]},{ang[2]}\n"
-            self.f_state.write(line)
+            self.engine_outputs.write(line)
 
 class PyBulletEngine(SimulatorEngine):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = PhysicsEngines.PYBULLET
+
     def init(self):
         import pybullet
         try:
@@ -114,16 +121,15 @@ class PyBulletEngine(SimulatorEngine):
         self.backend.setRealTimeSimulation(0)
         
         generate_world(self.backend)
-        if self.conf.UPDATE_URDF_MODEL:
-            generate_urdf_model(self.conf.BASE_DIRECTORY, self.conf.URDF_MODEL, self.conf.URDF_TEMPLATE, self.conf.FRAME_MASS, self.conf.FRAME_SIZE, self.conf.PROPELLERS, self.conf.MAIN_RADIUS)
+        urdf_model_path = generate_urdf_model(self.name.value, self.conf)
         
-        if not os.path.exists(self.conf.URDF_MODEL):
-            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(self.conf.URDF_MODEL))
+        if not os.path.exists(urdf_model_path):
+            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(urdf_model_path))
 
         try:
-            self.multirotor_avatar = self.backend.loadURDF(self.conf.URDF_MODEL, self.conf.INITIAL_POSITION, self.backend.getQuaternionFromEuler(self.conf.INITIAL_ROTATION)) # type: ignore
+            self.multirotor_avatar = self.backend.loadURDF(urdf_model_path, self.conf.INITIAL_POSITION, self.backend.getQuaternionFromEuler(self.conf.INITIAL_ROTATION)) # type: ignore
         except self.backend.error as e:
-            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(self.conf.URDF_MODEL, e))
+            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(urdf_model_path, e))
         
     def term(self):
         if self.backend.isConnected():
@@ -157,141 +163,24 @@ class PyBulletEngine(SimulatorEngine):
         return self.backend.getBaseVelocity(self.multirotor_avatar)
 
 class MuJoCoEngine(SimulatorEngine):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = PhysicsEngines.MUJOCO
+
     def init(self):
         import mujoco
         self.backend = mujoco
         self.viewer = None
+
+        urdf_model_path = generate_urdf_model(self.name.value, self.conf)
         
-        if self.conf.UPDATE_URDF_MODEL:
-            generate_urdf_model(self.conf.BASE_DIRECTORY, self.conf.URDF_MODEL, self.conf.URDF_TEMPLATE, self.conf.FRAME_MASS, self.conf.FRAME_SIZE, self.conf.PROPELLERS, self.conf.MAIN_RADIUS)
-        
-        if not os.path.exists(self.conf.URDF_MODEL):
-            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(self.conf.URDF_MODEL))
-
-        # Read the generated URDF template output
-        with open(self.conf.URDF_MODEL, 'r') as f:
-            urdf_content = f.read()
-
-        # --- Patching the URDF for MuJoCo ---
-        # 1. Inject <mujoco> block for environment settings (lights, options).
-        mjcf_header = f"""
-    <mujoco>
-        <option timestep="{self.conf.TIME_STEP}" gravity="0 0 {self.conf.G}"/>
-        <visual>
-            <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
-            <rgba haze="0.15 0.25 0.35 1"/>
-            <global azimuth="120" elevation="-20"/>
-        </visual>
-    </mujoco>
-"""
-        urdf_content = re.sub(r'(<robot[^>]*>)', r'\1' + mjcf_header, urdf_content, count=1)
-
-        # 4. Inject a 'world_root' link containing the floor and axes, and connect it to 'frame'.
-        #    This effectively adds the environment to the robot model.
-        world_env = """
-    <link name="world_root">
-        <visual>
-            <origin xyz="0 0 -1.0"/>
-            <geometry><box size="10 10 0.1"/></geometry>
-            <material name="floor"><color rgba="1 1 1 1"/></material>
-        </visual>
-        <collision>
-            <origin xyz="0 0 -1.0"/>
-            <geometry><box size="10 10 0.1"/></geometry>
-        </collision>
-    </link>
-    <link name="world_axis_x">
-        <inertial>
-            <mass value="0.001"/>
-            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-        </inertial>
-        <visual>
-            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
-            <material name="axis_x"><color rgba="1 0 0 1"/></material>
-        </visual>
-        <collision>
-            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
-        </collision>
-    </link>
-    <joint name="joint_axis_x" type="fixed">
-        <parent link="world_root"/>
-        <child link="world_axis_x"/>
-        <origin xyz="0.50 0 0" rpy="0 1.5708 0"/>
-    </joint>
-    <link name="world_axis_y">
-        <inertial>
-            <mass value="0.001"/>
-            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-        </inertial>
-        <visual>
-            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
-            <material name="axis_y"><color rgba="0 1 0 1"/></material>
-        </visual>
-        <collision>
-            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
-        </collision>
-    </link>
-    <joint name="joint_axis_y" type="fixed">
-        <parent link="world_root"/>
-        <child link="world_axis_y"/>
-        <origin xyz="0 0.50 0" rpy="1.5708 0 0"/>
-    </joint>
-    <link name="world_axis_z">
-        <inertial>
-            <mass value="0.001"/>
-            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-        </inertial>
-        <visual>
-            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
-            <material name="axis_z"><color rgba="0 0 1 1"/></material>
-        </visual>
-        <collision>
-            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
-        </collision>
-    </link>
-    <joint name="joint_axis_z" type="fixed">
-        <parent link="world_root"/>
-        <child link="world_axis_z"/>
-        <origin xyz="0 0 0.50"/>
-    </joint>
-    <link name="world_origin">
-        <inertial>
-            <mass value="0.001"/>
-            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-        </inertial>
-        <visual>
-            <geometry><sphere radius="0.03"/></geometry>
-            <material name="origin_white"><color rgba="1 1 1 1"/></material>
-        </visual>
-        <collision>
-            <geometry><sphere radius="0.001"/></geometry>
-        </collision>
-    </link>
-    <joint name="joint_origin" type="fixed">
-        <parent link="world_root"/>
-        <child link="world_origin"/>
-        <origin xyz="0 0 0"/>
-    </joint>
-    <joint name="root_joint" type="floating">
-        <parent link="world_root"/>
-        <child link="frame"/>
-        <dynamics damping="3.5" friction="0"/>
-    </joint>
-"""
-
-        urdf_content = urdf_content.replace('</robot>', world_env + '</robot>')
-
-        # Save the patched URDF
-        mujoco_urdf_path = self.conf.URDF_MODEL.replace('.urdf', '_mujoco.urdf')
-        if os.path.exists(mujoco_urdf_path):
-            os.remove(mujoco_urdf_path)
-        with open(mujoco_urdf_path, 'w') as f:
-            f.write(urdf_content)
+        if not os.path.exists(urdf_model_path):
+            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(urdf_model_path))
 
         try:
-            self.model = self.backend.MjModel.from_xml_path(mujoco_urdf_path)
+            self.model = self.backend.MjModel.from_xml_path(urdf_model_path)
         except ValueError as e:
-            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(mujoco_urdf_path, e))
+            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(urdf_model_path, e))
         
         self.data = self.backend.MjData(self.model)
         
@@ -429,10 +318,9 @@ class MuJoCoEngine(SimulatorEngine):
         return lin_vel_world, ang_vel_world
 
 def get_physics_engine(conf):
-    # Default to PyBullet if not specified
     engine_type = getattr(conf, 'PHYSICS_ENGINE')
     if engine_type == PhysicsEngines.PYBULLET:
-        return PyBulletEngine(conf, 'logs/thrust_torque_pybullet.csv', 'logs/state_pybullet.csv')
+        return PyBulletEngine(conf=conf, engine_inputs_path=f'{LOGS_PATH}/inputs_pybullet.csv', engine_outputs_path=f'{LOGS_PATH}/outputs_pybullet.csv')
     elif engine_type == PhysicsEngines.MUJOCO:
-        return MuJoCoEngine(conf, 'logs/thrust_torque_mujoco.csv', 'logs/state_mujoco.csv')
-    raise ValueError(f"Unknown physics engine: {engine_type}")
+        return MuJoCoEngine(conf=conf, engine_inputs_path=f'{LOGS_PATH}/inputs_mujoco.csv', engine_outputs_path=f'{LOGS_PATH}/outputs_mujoco.csv')
+    raise ValueError(ERR_ENGINE_UNKNOWN.format(engine_type))

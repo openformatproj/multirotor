@@ -99,8 +99,8 @@ def simulate(trace_filename=None, error_filename=None):
             time.sleep(1.5)
 
         log_queue = None
-        # Conditionally start the tracer based on configuration
         error_queue = None
+        # Conditionally start the tracer based on configuration
         if proj_conf.TRACER_ENABLED:
             if proj_conf.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS:
                 log_queue = multiprocessing.Queue()
@@ -115,16 +115,9 @@ def simulate(trace_filename=None, error_filename=None):
                 error_queue=error_queue
             )
 
-        top_execution = Execution(name='parallel_multirotor_execution',
-            parallelization_condition=lambda part: part.get_identifier() == 'multirotor',
-            mode=proj_conf.PARALLEL_EXECUTION_MODE,
-            log_queue=log_queue,
-            error_queue=error_queue
-        )
-
         data.configure(proj_conf)
 
-        top = Top('top', conf=proj_conf, execution_strategy=top_execution)
+        top = Top('top', conf=proj_conf, log_queue=log_queue, error_queue=error_queue)
 
         # Initialize the simulation to set up pybullet and get the time step
         top.init()
@@ -139,7 +132,8 @@ def simulate(trace_filename=None, error_filename=None):
         timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=proj_conf.DURATION_SECONDS)
 
         # Connect the timer to the simulation's main event queue
-        top.connect_event_source(timer, 'time_event_in')
+        event_queues = top.get_event_queues()
+        top.connect_event_source(timer, event_queues[0].get_identifier())
 
         Tracer.log(LogLevel.INFO, MAIN_COMPONENT_ID, LOG_EVENT_START, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_START.format(datetime.now())})
         
