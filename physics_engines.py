@@ -11,6 +11,7 @@ from enum import Enum
 # --- Engines ---
 class PhysicsEngines(Enum):
     PYBULLET = 'PyBullet'
+    MUJOCO = 'MuJoCo'
 
 # --- Error Messages ---
 ERR_URDF_NOT_FOUND = "URDF model file not found at {}. Generation failed."
@@ -155,9 +156,283 @@ class PyBulletEngine(SimulatorEngine):
     def get_first_order_state(self):
         return self.backend.getBaseVelocity(self.multirotor_avatar)
 
+class MuJoCoEngine(SimulatorEngine):
+    def init(self):
+        import mujoco
+        self.backend = mujoco
+        self.viewer = None
+        
+        if self.conf.UPDATE_URDF_MODEL:
+            generate_urdf_model(self.conf.BASE_DIRECTORY, self.conf.URDF_MODEL, self.conf.URDF_TEMPLATE, self.conf.FRAME_MASS, self.conf.FRAME_SIZE, self.conf.PROPELLERS, self.conf.MAIN_RADIUS)
+        
+        if not os.path.exists(self.conf.URDF_MODEL):
+            raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(self.conf.URDF_MODEL))
+
+        # Read the generated URDF template output
+        with open(self.conf.URDF_MODEL, 'r') as f:
+            urdf_content = f.read()
+
+        # --- Patching the URDF for MuJoCo ---
+        # 1. Inject <mujoco> block for environment settings (lights, options).
+        mjcf_header = f"""
+    <mujoco>
+        <option timestep="{self.conf.TIME_STEP}" gravity="0 0 {self.conf.G}"/>
+        <visual>
+            <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+            <rgba haze="0.15 0.25 0.35 1"/>
+            <global azimuth="120" elevation="-20"/>
+        </visual>
+    </mujoco>
+"""
+        urdf_content = re.sub(r'(<robot[^>]*>)', r'\1' + mjcf_header, urdf_content, count=1)
+
+        # 4. Inject a 'world_root' link containing the floor and axes, and connect it to 'frame'.
+        #    This effectively adds the environment to the robot model.
+        world_env = """
+    <link name="world_root">
+        <visual>
+            <origin xyz="0 0 -1.0"/>
+            <geometry><box size="10 10 0.1"/></geometry>
+            <material name="floor"><color rgba="1 1 1 1"/></material>
+        </visual>
+        <collision>
+            <origin xyz="0 0 -1.0"/>
+            <geometry><box size="10 10 0.1"/></geometry>
+        </collision>
+    </link>
+    <link name="world_axis_x">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+        <visual>
+            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
+            <material name="axis_x"><color rgba="1 0 0 1"/></material>
+        </visual>
+        <collision>
+            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
+        </collision>
+    </link>
+    <joint name="joint_axis_x" type="fixed">
+        <parent link="world_root"/>
+        <child link="world_axis_x"/>
+        <origin xyz="0.50 0 0" rpy="0 1.5708 0"/>
+    </joint>
+    <link name="world_axis_y">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+        <visual>
+            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
+            <material name="axis_y"><color rgba="0 1 0 1"/></material>
+        </visual>
+        <collision>
+            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
+        </collision>
+    </link>
+    <joint name="joint_axis_y" type="fixed">
+        <parent link="world_root"/>
+        <child link="world_axis_y"/>
+        <origin xyz="0 0.50 0" rpy="1.5708 0 0"/>
+    </joint>
+    <link name="world_axis_z">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+        <visual>
+            <geometry><cylinder radius="0.03" length="1.0"/></geometry>
+            <material name="axis_z"><color rgba="0 0 1 1"/></material>
+        </visual>
+        <collision>
+            <geometry><cylinder radius="0.001" length="1.0"/></geometry>
+        </collision>
+    </link>
+    <joint name="joint_axis_z" type="fixed">
+        <parent link="world_root"/>
+        <child link="world_axis_z"/>
+        <origin xyz="0 0 0.50"/>
+    </joint>
+    <link name="world_origin">
+        <inertial>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+        <visual>
+            <geometry><sphere radius="0.03"/></geometry>
+            <material name="origin_white"><color rgba="1 1 1 1"/></material>
+        </visual>
+        <collision>
+            <geometry><sphere radius="0.001"/></geometry>
+        </collision>
+    </link>
+    <joint name="joint_origin" type="fixed">
+        <parent link="world_root"/>
+        <child link="world_origin"/>
+        <origin xyz="0 0 0"/>
+    </joint>
+    <joint name="root_joint" type="floating">
+        <parent link="world_root"/>
+        <child link="frame"/>
+        <dynamics damping="3.5" friction="0"/>
+    </joint>
+"""
+
+        urdf_content = urdf_content.replace('</robot>', world_env + '</robot>')
+
+        # Save the patched URDF
+        mujoco_urdf_path = self.conf.URDF_MODEL.replace('.urdf', '_mujoco.urdf')
+        if os.path.exists(mujoco_urdf_path):
+            os.remove(mujoco_urdf_path)
+        with open(mujoco_urdf_path, 'w') as f:
+            f.write(urdf_content)
+
+        try:
+            self.model = self.backend.MjModel.from_xml_path(mujoco_urdf_path)
+        except ValueError as e:
+            raise RuntimeError(ERR_URDF_LOAD_FAILED.format(mujoco_urdf_path, e))
+        
+        self.data = self.backend.MjData(self.model)
+        
+        self.backend.mj_resetData(self.model, self.data)
+        
+        # Initial Position
+        self.data.qpos[0:3] = self.conf.INITIAL_POSITION
+        
+        # Initial Rotation (Euler -> Quat [w, x, y, z])
+        roll, pitch, yaw = self.conf.INITIAL_ROTATION
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        w = cr * cp * cy + sr * sp * sy
+        x = sr * cp * cy - cr * sp * sy
+        y = cr * sp * cy + sr * cp * sy
+        z = cr * cp * sy - sr * sp * cy
+        
+        self.data.qpos[3:7] = [w, x, y, z]
+        
+        # Update kinematics to ensure xmat is valid for the first step
+        self.backend.mj_forward(self.model, self.data)
+        
+        # Buffer for external forces/torques: body_id -> [fx, fy, fz, tx, ty, tz]
+        self.pending_forces = {}
+        
+        # Identify the main body.
+        self.frame_body_id = self.backend.mj_name2id(self.model, self.backend.mjtObj.mjOBJ_BODY, 'frame')
+        if self.frame_body_id == -1:
+            # Fallback if name not found, though 'frame' should exist from URDF.
+            self.frame_body_id = 1
+
+        self.pending_forces[self.frame_body_id] = np.zeros(6)
+
+        self.xmat = self.data.xmat[self.frame_body_id].reshape(3, 3)
+            
+        # Pre-calculate propeller offsets relative to the frame center
+        self.propeller_offsets = []
+        for i in range(self.conf.PROPELLERS):
+            angle = 2 * math.pi * i / self.conf.PROPELLERS
+            x = self.conf.MAIN_RADIUS * math.cos(angle)
+            y = self.conf.MAIN_RADIUS * math.sin(angle)
+            self.propeller_offsets.append(np.array([x, y, 0.0]))
+            
+        if self.conf.GUI:
+            # Initialize thrust storage for visualization
+            self.current_thrusts = {}
+            import mujoco.viewer
+            self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+            
+            # Place camera on a far point directed towards the origin
+            cam_pos = np.array([-4.0, 4.0, 2.0])
+            target_pos = np.array([0.0, 0.0, 0.0])
+            
+            self.viewer.cam.lookat[:] = target_pos
+            
+            rel = cam_pos - target_pos
+            dist = np.linalg.norm(rel)
+            if dist > 0:
+                self.viewer.cam.distance = dist
+                self.viewer.cam.azimuth = math.degrees(math.atan2(rel[1], rel[0]))
+                self.viewer.cam.elevation = -math.degrees(math.asin(rel[2] / dist))
+
+    def term(self):
+        if self.viewer:
+            self.viewer.close()
+
+    def is_connected(self):
+        return hasattr(self, 'model') and self.model is not None
+
+    def set_force(self, propeller_index, thrust):
+        # Force in body frame
+        f_body = np.array([0, 0, thrust])
+        
+        # Torque due to lever arm (r x F)
+        r = self.propeller_offsets[propeller_index]
+        t_body = np.cross(r, f_body)
+
+        f_global = self.xmat @ f_body
+        t_global = self.xmat @ t_body
+        
+        # MuJoCo xfrc_applied is [Force, Torque]
+        self.pending_forces[self.frame_body_id][3:] += t_global
+        self.pending_forces[self.frame_body_id][:3] += f_global
+
+    def set_torque(self, propeller_index, torque):
+        t_body = np.array([0, 0, torque])
+        t_global = self.xmat @ t_body
+        
+        # MuJoCo xfrc_applied is [Force, Torque]
+        self.pending_forces[self.frame_body_id][3:] += t_global
+
+    def step(self):
+        # Apply forces BEFORE stepping the simulation
+        for body_id, wrench in self.pending_forces.items():
+            self.data.xfrc_applied[body_id] = wrench
+        
+        self.backend.mj_step(self.model, self.data)
+        self.backend.mj_kinematics(self.model, self.data)
+        self.xmat = self.data.xmat[self.frame_body_id].reshape(3, 3)
+        self.pending_forces.clear()
+        self.pending_forces[self.frame_body_id] = np.zeros(6)
+        
+        if self.viewer and self.viewer.is_running():
+            self.viewer.user_scn.ngeom = 0
+            self.viewer.sync()
+        self.sim_time += self.conf.TIME_STEP
+
+    def get_zero_order_state(self):
+        pos = self.data.qpos[0:3]
+        w, x, y, z = self.data.qpos[3:7]
+        
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        sinp = 2 * (w * y - z * x)
+        pitch = math.copysign(math.pi / 2, sinp) if abs(sinp) >= 1 else math.asin(sinp)
+
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+        
+        return pos, [roll, pitch, yaw]
+
+    def get_first_order_state(self):
+        # Use qvel (updated by mj_step) and xmat (updated by mj_kinematics) to avoid one-step delay
+        lin_vel_world = self.data.qvel[0:3]
+        ang_vel_body = self.data.qvel[3:6]
+        ang_vel_world = self.xmat @ ang_vel_body
+        return lin_vel_world, ang_vel_world
+
 def get_physics_engine(conf):
     # Default to PyBullet if not specified
     engine_type = getattr(conf, 'PHYSICS_ENGINE')
     if engine_type == PhysicsEngines.PYBULLET:
         return PyBulletEngine(conf, 'logs/thrust_torque_pybullet.csv', 'logs/state_pybullet.csv')
+    elif engine_type == PhysicsEngines.MUJOCO:
+        return MuJoCoEngine(conf, 'logs/thrust_torque_mujoco.csv', 'logs/state_mujoco.csv')
     raise ValueError(f"Unknown physics engine: {engine_type}")
