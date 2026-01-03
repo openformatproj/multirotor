@@ -211,9 +211,12 @@ class PyBulletEngine(SimulatorEngine):
         except self.backend.error as e:
             raise RuntimeError(ERR_URDF_LOAD_FAILED.format(urdf_model_path, e))
         
+        # self.log_id = self.backend.startStateLogging(self.backend.STATE_LOGGING_VIDEO_MP4, "1.mp4")
+        
     def term(self):
         """Disconnects from the PyBullet simulation."""
         if self.backend.isConnected():
+            # self.backend.stopStateLogging(self.log_id)
             self.backend.disconnect()
 
     def is_connected(self):
