@@ -8,7 +8,6 @@ import time
 import multiprocessing
 from functools import partial
 from typing import Optional
-from ml.strategies import Execution
 from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log, merge_trace_logs
 from ml.enums import OnFullBehavior, LogLevel, ExecutionMode
@@ -158,6 +157,7 @@ def simulate(trace_filename=None, error_filename=None):
 
         # Block here and wait for the main simulation thread to finish.
         top.wait()
+        top.term()
 
         if top.get_exception() or timer.get_exception():
             Tracer.log(LogLevel.ERROR, MAIN_COMPONENT_ID, LOG_EVENT_FAILURE, {LOG_DETAIL_KEY_MESSAGE: MSG_SIM_FAILURE})
