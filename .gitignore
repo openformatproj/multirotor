@@ -5,3 +5,4 @@ sim_conf.py
 /.vscode
 /img/*.webm
 /img/*.drawio
+/.gen
