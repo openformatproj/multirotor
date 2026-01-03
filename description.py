@@ -89,7 +89,7 @@ class Multirotor(Part):
             CONTROLLER_ID: Controller(CONTROLLER_ID, conf)
         }
         if conf.PLOT:
-            parts[PLOTTER_ID] = XYZ_Monitor(PLOTTER_ID, plot_decimation=conf.PLOT_DECIMATION)
+            parts[PLOTTER_ID] = XYZ_Monitor(PLOTTER_ID, conf)
 
         for i in PROPELLERS_INDEXES(conf):
             ports.append(Port(THRUST_PORT_TPL.format(i), Port.OUT))
