@@ -136,7 +136,7 @@ def simulate(trace_filename=None, error_filename=None):
         # In non-real-time mode (`DROP`), it drops events to keep running,
         # which can be useful for non-critical runs or debugging.
         on_full_behavior = OnFullBehavior.FAIL if proj_conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-        timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=5)
+        timer = Timer(identifier='physics_timer', interval_seconds=proj_conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=proj_conf.DURATION_SECONDS)
 
         # Connect the timer to the simulation's main event queue
         top.connect_event_source(timer, 'time_event_in')
