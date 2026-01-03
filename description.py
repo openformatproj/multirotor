@@ -160,6 +160,9 @@ class Rigid_Body_Simulator(Part):
         advances the physics engine by one time step, and then reads the new
         state (position, orientation, etc.) from the simulated avatar, setting
         the output ports for the next control cycle.
+
+        Raises:
+            RuntimeError: If the physics engine is not connected.
         """
         if not self.engine or not self.engine.is_connected():
             # If the physics engine is not connected, we cannot proceed.

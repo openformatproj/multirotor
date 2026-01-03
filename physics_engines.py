@@ -24,7 +24,16 @@ ERR_ENGINE_UNKNOWN = "Unknown physics engine: {}"
 LOGS_PATH = 'logs'
 
 class SimulatorEngine(ABC):
+    """Abstract base class for physics engine wrappers."""
     def __init__(self, conf, engine_inputs_path, engine_outputs_path):
+        """
+        Initializes the SimulatorEngine.
+
+        Args:
+            conf: The simulation configuration object.
+            engine_inputs_path: Path to the CSV file for logging engine inputs.
+            engine_outputs_path: Path to the CSV file for logging engine outputs.
+        """
         self.backend = None
         self.conf = conf
         self.name = None
@@ -36,30 +45,74 @@ class SimulatorEngine(ABC):
         self.engine_outputs_path = engine_outputs_path
 
     @abstractmethod
-    def init(self): pass
+    def init(self):
+        """Initializes the physics engine backend."""
+        pass
 
     @abstractmethod
-    def term(self): pass
+    def term(self):
+        """Terminates the physics engine backend."""
+        pass
 
     @abstractmethod
-    def is_connected(self): pass
+    def is_connected(self):
+        """
+        Checks if the physics engine is connected.
+
+        Returns:
+            bool: True if connected, False otherwise.
+        """
+        pass
 
     @abstractmethod
-    def set_force(self, propeller_index, thrust): pass
+    def set_force(self, propeller_index, thrust):
+        """
+        Sets the thrust force for a specific propeller.
+
+        Args:
+            propeller_index: The index of the propeller.
+            thrust: The thrust force to apply.
+        """
+        pass
 
     @abstractmethod
-    def set_torque(self, propeller_index, torque): pass
+    def set_torque(self, propeller_index, torque):
+        """
+        Sets the torque for a specific propeller.
+
+        Args:
+            propeller_index: The index of the propeller.
+            torque: The torque to apply.
+        """
+        pass
 
     @abstractmethod
-    def step(self): pass
+    def step(self):
+        """Advances the simulation by one time step."""
+        pass
 
     @abstractmethod
-    def get_zero_order_state(self): pass
+    def get_zero_order_state(self):
+        """
+        Retrieves the zero-order state (position and orientation).
+
+        Returns:
+            tuple: A tuple containing position [x, y, z] and orientation [roll, pitch, yaw].
+        """
+        pass
 
     @abstractmethod
-    def get_first_order_state(self): pass
+    def get_first_order_state(self):
+        """
+        Retrieves the first-order state (linear and angular velocity).
+
+        Returns:
+            tuple: A tuple containing linear velocity [vx, vy, vz] and angular velocity [wx, wy, wz].
+        """
+        pass
 
     def init_logs(self):
+        """Initializes the CSV logs for engine inputs and outputs."""
         if not os.path.exists(LOGS_PATH):
             os.makedirs(LOGS_PATH)
         self.engine_inputs = open(self.engine_inputs_path, 'w')
@@ -69,15 +122,25 @@ class SimulatorEngine(ABC):
         self.engine_outputs.write('time,x,y,z,roll,pitch,yaw,vx,vy,vz,wx,wy,wz\n')
 
     def term_logs(self):
+        """Closes the CSV log files."""
         if self.engine_inputs: self.engine_inputs.close()
         if self.engine_outputs: self.engine_outputs.close()
 
     def log_input(self, index, key, value):
+        """
+        Buffers an input value for logging.
+
+        Args:
+            index: The index of the propeller.
+            key: The name of the input (e.g., 'thrust', 'torque').
+            value: The value to log.
+        """
         if index not in self.input_log_buffer:
             self.input_log_buffer[index] = {}
         self.input_log_buffer[index][key] = value
 
     def write_log_inputs(self):
+        """Writes the buffered input values to the CSV log."""
         if self.engine_inputs:
             line = f"{self.sim_time}"
             for i in range(self.conf.PROPELLERS):
@@ -87,16 +150,33 @@ class SimulatorEngine(ABC):
             self.input_log_buffer.clear()
 
     def write_log_outputs(self, pos, rot, lin, ang):
+        """
+        Writes the output state values to the CSV log.
+
+        Args:
+            pos: Position [x, y, z].
+            rot: Rotation [roll, pitch, yaw].
+            lin: Linear velocity [vx, vy, vz].
+            ang: Angular velocity [wx, wy, wz].
+        """
         if self.engine_outputs:
             line = f"{self.sim_time},{pos[0]},{pos[1]},{pos[2]},{rot[0]},{rot[1]},{rot[2]},{lin[0]},{lin[1]},{lin[2]},{ang[0]},{ang[1]},{ang[2]}\n"
             self.engine_outputs.write(line)
 
 class PyBulletEngine(SimulatorEngine):
+    """PyBullet physics engine implementation."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = PhysicsEngines.PYBULLET
 
     def init(self):
+        """
+        Initializes the PyBullet simulation.
+
+        Raises:
+            RuntimeError: If connection fails or URDF loading fails.
+            FileNotFoundError: If the URDF file is not found.
+        """
         import pybullet
         try:
             from pybullet_utils.pybullet_c_api import allowInternalThreadCaches
@@ -132,21 +212,26 @@ class PyBulletEngine(SimulatorEngine):
             raise RuntimeError(ERR_URDF_LOAD_FAILED.format(urdf_model_path, e))
         
     def term(self):
+        """Disconnects from the PyBullet simulation."""
         if self.backend.isConnected():
             self.backend.disconnect()
 
     def is_connected(self):
+        """Checks if connected to PyBullet."""
         return self.backend.isConnected()
 
     def set_force(self, propeller_index, thrust):
+        """Applies thrust force to a propeller link."""
         # Apply force in the Z-axis of the link frame
         self.backend.applyExternalForce(self.multirotor_avatar, propeller_index, [0, 0, thrust], [0, 0, 0], self.backend.LINK_FRAME)
 
     def set_torque(self, propeller_index, torque):
+        """Applies torque to a propeller link."""
         # Apply torque around the Z-axis of the link frame
         self.backend.applyExternalTorque(self.multirotor_avatar, propeller_index, [0, 0, torque], self.backend.LINK_FRAME)
 
     def step(self):
+        """Steps the PyBullet simulation."""
         try:
             with self.allowInternalThreadCaches(self.backend):
                 self.backend.stepSimulation()
@@ -155,19 +240,29 @@ class PyBulletEngine(SimulatorEngine):
         self.sim_time += self.conf.TIME_STEP
 
     def get_zero_order_state(self):
+        """Gets position and orientation from PyBullet."""
         pos, quat = self.backend.getBasePositionAndOrientation(self.multirotor_avatar)
         euler = self.backend.getEulerFromQuaternion(quat)
         return pos, euler
 
     def get_first_order_state(self):
+        """Gets linear and angular velocities from PyBullet."""
         return self.backend.getBaseVelocity(self.multirotor_avatar)
 
 class MuJoCoEngine(SimulatorEngine):
+    """MuJoCo physics engine implementation."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = PhysicsEngines.MUJOCO
 
     def init(self):
+        """
+        Initializes the MuJoCo simulation.
+
+        Raises:
+            FileNotFoundError: If the URDF file is not found.
+            RuntimeError: If URDF loading fails.
+        """
         import mujoco
         self.backend = mujoco
         self.viewer = None
@@ -249,13 +344,16 @@ class MuJoCoEngine(SimulatorEngine):
                 self.viewer.cam.elevation = -math.degrees(math.asin(rel[2] / dist))
 
     def term(self):
+        """Closes the MuJoCo viewer if active."""
         if self.viewer:
             self.viewer.close()
 
     def is_connected(self):
+        """Checks if the MuJoCo model is loaded."""
         return hasattr(self, 'model') and self.model is not None
 
     def set_force(self, propeller_index, thrust):
+        """Applies thrust force to the body via pending forces buffer."""
         # Force in body frame
         f_body = np.array([0, 0, thrust])
         
@@ -271,6 +369,7 @@ class MuJoCoEngine(SimulatorEngine):
         self.pending_forces[self.frame_body_id][:3] += f_global
 
     def set_torque(self, propeller_index, torque):
+        """Applies torque to the body via pending forces buffer."""
         t_body = np.array([0, 0, torque])
         t_global = self.xmat @ t_body
         
@@ -278,6 +377,7 @@ class MuJoCoEngine(SimulatorEngine):
         self.pending_forces[self.frame_body_id][3:] += t_global
 
     def step(self):
+        """Steps the MuJoCo simulation."""
         # Apply forces BEFORE stepping the simulation
         for body_id, wrench in self.pending_forces.items():
             self.data.xfrc_applied[body_id] = wrench
@@ -294,6 +394,7 @@ class MuJoCoEngine(SimulatorEngine):
         self.sim_time += self.conf.TIME_STEP
 
     def get_zero_order_state(self):
+        """Gets position and orientation from MuJoCo data."""
         pos = self.data.qpos[0:3]
         w, x, y, z = self.data.qpos[3:7]
         
@@ -311,6 +412,7 @@ class MuJoCoEngine(SimulatorEngine):
         return pos, [roll, pitch, yaw]
 
     def get_first_order_state(self):
+        """Gets linear and angular velocities from MuJoCo data."""
         # Use qvel (updated by mj_step) and xmat (updated by mj_kinematics) to avoid one-step delay
         lin_vel_world = self.data.qvel[0:3]
         ang_vel_body = self.data.qvel[3:6]
@@ -318,6 +420,18 @@ class MuJoCoEngine(SimulatorEngine):
         return lin_vel_world, ang_vel_world
 
 def get_physics_engine(conf):
+    """
+    Factory method to create a physics engine instance based on configuration.
+
+    Args:
+        conf: The simulation configuration object.
+
+    Returns:
+        SimulatorEngine: An instance of the configured physics engine.
+
+    Raises:
+        ValueError: If the configured engine type is unknown.
+    """
     engine_type = getattr(conf, 'PHYSICS_ENGINE')
     if engine_type == PhysicsEngines.PYBULLET:
         return PyBulletEngine(conf=conf, engine_inputs_path=f'{LOGS_PATH}/inputs_pybullet.csv', engine_outputs_path=f'{LOGS_PATH}/outputs_pybullet.csv')
