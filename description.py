@@ -1,6 +1,7 @@
 from ml.engine import Part, Port, EventQueue
 from ml.strategies import Execution, all_input_ports_updated, time_updated
 from ml.parts import EventToDataSynchronizer
+from ml.data import Number
 
 from ml import conf as ml_conf
 
@@ -253,7 +254,8 @@ class Top(Part):
             TIME_DIST_ID: EventToDataSynchronizer(
                 TIME_DIST_ID,
                 input_queue_id=TIME_EVENT_IN_Q,
-                output_port_id=TIME_OUT_PORT
+                output_port_id=TIME_OUT_PORT,
+                number_type=Number
             ),
             SIMULATOR_ID: Simulator(SIMULATOR_ID, conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
