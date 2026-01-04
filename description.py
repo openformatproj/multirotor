@@ -142,7 +142,7 @@ class Multirotor(Part):
                 self.connect(sensors.get_port(name), plotter.get_port(name))
 
 
-class Rigid_Body_Simulator(Part):
+class Simulator(Part):
     """
     A behavioral part that wraps the physics engine.
 
@@ -204,7 +204,7 @@ class Rigid_Body_Simulator(Part):
 
     def __init__(self, identifier: str, conf: object):
         """
-        Initializes the Rigid_Body_Simulator behavioral part.
+        Initializes the Simulator behavioral part.
 
         Args:
             identifier (str): The unique name for this part.
@@ -225,15 +225,15 @@ class Rigid_Body_Simulator(Part):
         self.engine = get_physics_engine(conf)
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in propellers_indexes]
         self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in propellers_indexes]
-        self.add_hook(ml_conf.HOOK_TYPE_INIT, Rigid_Body_Simulator.init)
-        self.add_hook(ml_conf.HOOK_TYPE_TERM, Rigid_Body_Simulator.term)
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, Simulator.init)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, Simulator.term)
 
 
 class Top(Part):
     """
     The top-level structural part for the entire simulation.
 
-    This part composes the `Multirotor` model and the `Rigid_Body_Simulator`,
+    This part composes the `Multirotor` model and the `Simulator`,
     connecting them together. It also includes a time distributor to synchronize
     all components with a single time signal, driven by an external `Timer`
     event source.
@@ -255,7 +255,7 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf),
+            SIMULATOR_ID: Simulator(SIMULATOR_ID, conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
         execution_strategy = Execution(name='parallel_multirotor_execution',

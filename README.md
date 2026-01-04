@@ -87,7 +87,7 @@ REAL_TIME_SIMULATION = False
 HIGH_PRIORITY = False
 # Sets the simulation time step in seconds (240 Hz)
 TIME_STEP = 1./120.
-# Sets how to parallelize parts meant to be executed concurrently (`Rigid_Body_Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`.
+# Sets how to parallelize parts meant to be executed concurrently (`Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`.
 PARALLEL_EXECUTION_MODE = ExecutionMode.THREAD
 # Sets the duration of the simulation in seconds.
 DURATION_SECONDS = 10
@@ -140,7 +140,7 @@ The idea in this case is to define the behavior of bottom-level components (moto
 ![Figure 3: Multirotor model structure](img/3.png)
 <p align="center">Figure 3: Multirotor model structure</p>
 
-<a href="#figure-3">Figure 3</a> shows the high-level structure of the `Multirotor` model (the diagram has been generated with [openformatproj/diagrams](https://github.com/openformatproj/diagrams)). The `Top` component encapsulates the `Multirotor` model and the `Rigid_Body_Simulator`. The entire simulation is driven by an external `Timer` (an `EventSource`), which provides time-tick events to the `Top` part. This event-driven approach ensures that the simulation only executes when a time step is required.
+<a href="#figure-3">Figure 3</a> shows the high-level structure of the `Multirotor` model (the diagram has been generated with [openformatproj/diagrams](https://github.com/openformatproj/diagrams)). The `Top` component encapsulates the `Multirotor` model and the `Simulator`. The entire simulation is driven by an external `Timer` (an `EventSource`), which provides time-tick events to the `Top` part. This event-driven approach ensures that the simulation only executes when a time step is required.
 
 Here's a snippet of how the environment is built at the code level (`src/description.py`):
 
@@ -181,7 +181,7 @@ class Multirotor(Part):
 
         # Connect time, position, orientation, etc. to inner parts
 
-class Rigid_Body_Simulator(Part):
+class Simulator(Part):
 
     def behavior(self):
         if not self.engine or not self.engine.is_connected():
@@ -224,8 +224,8 @@ class Rigid_Body_Simulator(Part):
         self.engine = get_physics_engine(conf)
         self.thrust_ports = [self.get_port(MULTIROTOR_THRUST_PORT_TPL.format(i)) for i in propellers_indexes]
         self.torque_ports = [self.get_port(MULTIROTOR_TORQUE_PORT_TPL.format(i)) for i in propellers_indexes]
-        self.add_hook(ml_conf.HOOK_TYPE_INIT, Rigid_Body_Simulator.init)
-        self.add_hook(ml_conf.HOOK_TYPE_TERM, Rigid_Body_Simulator.term)
+        self.add_hook(ml_conf.HOOK_TYPE_INIT, Simulator.init)
+        self.add_hook(ml_conf.HOOK_TYPE_TERM, Simulator.term)
 
 class Top(Part):
 
@@ -237,7 +237,7 @@ class Top(Part):
                 input_queue_id=TIME_EVENT_IN_Q,
                 output_port_id=TIME_OUT_PORT
             ),
-            SIMULATOR_ID: Rigid_Body_Simulator(SIMULATOR_ID, conf),
+            SIMULATOR_ID: Simulator(SIMULATOR_ID, conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
         execution_strategy = Execution(name='parallel_multirotor_execution',
@@ -263,7 +263,7 @@ class Top(Part):
         # Connect time, position, orientation, etc. to simulator and multirotor
 ```
 
-As it's possible to understand, `class Multirotor` defines its ports, the parts it's composed of (motors, propellers, sensors, the trajectory_planner and the controller) and their connections. All these parts are further defined in their specific subfolders, such as `./motor`, `./propeller`, and so on. This kind of description is called *structural* and allows building hierarchies. `class Rigid_Body_Simulator` provides instead an example of *behavioral* description:
+As it's possible to understand, `class Multirotor` defines its ports, the parts it's composed of (motors, propellers, sensors, the trajectory_planner and the controller) and their connections. All these parts are further defined in their specific subfolders, such as `./motor`, `./propeller`, and so on. This kind of description is called *structural* and allows building hierarchies. `class Simulator` provides instead an example of *behavioral* description:
 
 * Whenever time port is updated, position, orientation and their derivatives are extracted from the simulation environment (specifically, from the multirotor avatar) and sent on output ports.
 * When, moreover, thrusts and torques are updated by the multirotor model, they are applied to the avatar and the simulation engine is stepped.

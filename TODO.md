@@ -26,8 +26,8 @@ The current implementation uses primitive types (e.g., `list`, `float`) for data
 
 This section lists open questions and design areas that require further thought and discussion.
 
-### 1. Decouple `Rigid_Body_Simulator` from PyBullet
-- **Observation**: The `Rigid_Body_Simulator` part in `description.py` contains a lot of PyBullet-specific logic.
+### 1. Decouple `Simulator` from PyBullet
+- **Observation**: The `Simulator` part in `description.py` contains a lot of PyBullet-specific logic.
 - **Goal**: Refactor it to be more generic. This could involve creating an abstract `PhysicsSimulator` base class and a concrete `PyBulletSimulator` implementation. This would make the framework more extensible to other physics engines in the future.
 
 ### 2. Review and Refactor Constant Definitions
