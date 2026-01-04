@@ -214,6 +214,7 @@ def export_diagram(structure_filename=None, part_id=None):
     """
     print(MSG_DIAG_INSTANTIATING)
     configuration = Configuration(conf)
+    data.configure(configuration)
     top = Top('top', conf=configuration)
     
     # Traverse the hierarchy to find the requested part
