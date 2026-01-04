@@ -4,6 +4,8 @@ import numpy as np
 import re
 import xml.dom.minidom
 
+import simulator.conf as conf
+
 class ItemList(list):
 
     def __init__(self, size):
@@ -37,7 +39,16 @@ def get_propellers_positions(propellers, main_radius):
         positions[i] = [x, y, 0.0]
     return positions
 
-def generate_urdf_model(engine, conf):
+def get_propellers_offsets(propellers):
+    propeller_offsets = []
+    for i in range(propellers):
+        angle = 2 * math.pi * i / propellers
+        x = conf.MAIN_RADIUS * math.cos(angle)
+        y = conf.MAIN_RADIUS * math.sin(angle)
+        propeller_offsets.append(np.array([x, y, 0.0]))
+    return propeller_offsets
+
+def generate_urdf_model(engine, propellers, time_step):
 
     if conf.UPDATE_URDF_MODEL:
 
@@ -52,12 +63,12 @@ def generate_urdf_model(engine, conf):
             'mass': conf.FRAME_MASS,
             'size': conf.FRAME_SIZE,
             'inertia_matrix': get_inertia_matrix(conf.FRAME_MASS, conf.FRAME_SIZE),
-            'propellers': conf.PROPELLERS
+            'propellers': propellers
         }
 
-        propellers_positions = get_propellers_positions(conf.PROPELLERS, conf.MAIN_RADIUS)
-        xyz = ItemList(conf.PROPELLERS)
-        for i in range(1, conf.PROPELLERS + 1):
+        propellers_positions = get_propellers_positions(propellers, conf.MAIN_RADIUS)
+        xyz = ItemList(propellers)
+        for i in range(1, propellers + 1):
             xyz[i] = f"{propellers_positions[i][0]} {propellers_positions[i][1]} {propellers_positions[i][2]}"
         context['xyz'] = xyz
 
@@ -76,7 +87,7 @@ def generate_urdf_model(engine, conf):
             # 1. Inject <mujoco> block for environment settings (lights, options).
             mjcf_header = f"""
             <mujoco>
-                <option timestep="{conf.TIME_STEP}" gravity="0 0 {conf.G}"/>
+                <option timestep="{time_step}" gravity="0 0 {conf.G}"/>
                 <visual>
                     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
                     <rgba haze="0.15 0.25 0.35 1"/>

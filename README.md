@@ -65,7 +65,9 @@ A `src/sim_conf.py` file must be available. This is an example:
 from math import cos, sin
 from ml.data import register_data_type, Number
 from ml.enums import ExecutionMode
-from physics_engines import PhysicsEngines
+from simulator.physics.engines import PhysicsEngines
+
+PROPELLERS = 4
 
 # --- Numerical Backend Configuration ---
 register_data_type(Number)
@@ -83,6 +85,8 @@ PHYSICS_ENGINE = PhysicsEngines.PYBULLET
 REAL_TIME_SIMULATION = False
 # If `True`, increases the OS process priority to reduce scheduling jitter, crucial for `REAL_TIME_SIMULATION`.
 HIGH_PRIORITY = False
+# Sets the simulation time step in seconds (240 Hz)
+TIME_STEP = 1./120.
 # Sets how to parallelize parts meant to be executed concurrently (`Rigid_Body_Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`.
 PARALLEL_EXECUTION_MODE = ExecutionMode.THREAD
 # Sets the duration of the simulation in seconds.

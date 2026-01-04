@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 import os
 import math
 import numpy as np
-from services import generate_urdf_model
-from world.services import generate_world
+from simulator.physics.services import generate_urdf_model, get_propellers_offsets
+from simulator.world.services import generate_world
 
 from enum import Enum
 
@@ -196,12 +196,11 @@ class PyBulletEngine(SimulatorEngine):
         if not self.backend.isConnected():
             raise RuntimeError(ERR_ENGINE_CONNECT_NO_EXCEPTION)
 
-        self.backend.setGravity(0, 0, self.conf.G)
         self.backend.setTimeStep(self.conf.TIME_STEP)
         self.backend.setRealTimeSimulation(0)
         
         generate_world(self.backend)
-        urdf_model_path = generate_urdf_model(self.name.value, self.conf)
+        urdf_model_path = generate_urdf_model(self.name.value, self.conf.PROPELLERS, self.conf.TIME_STEP)
         
         if not os.path.exists(urdf_model_path):
             raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(urdf_model_path))
@@ -270,7 +269,7 @@ class MuJoCoEngine(SimulatorEngine):
         self.backend = mujoco
         self.viewer = None
 
-        urdf_model_path = generate_urdf_model(self.name.value, self.conf)
+        urdf_model_path = generate_urdf_model(self.name.value, self.conf.PROPELLERS, self.conf.TIME_STEP)
         
         if not os.path.exists(urdf_model_path):
             raise FileNotFoundError(ERR_URDF_NOT_FOUND.format(urdf_model_path))
@@ -320,12 +319,7 @@ class MuJoCoEngine(SimulatorEngine):
         self.xmat = self.data.xmat[self.frame_body_id].reshape(3, 3)
             
         # Pre-calculate propeller offsets relative to the frame center
-        self.propeller_offsets = []
-        for i in range(self.conf.PROPELLERS):
-            angle = 2 * math.pi * i / self.conf.PROPELLERS
-            x = self.conf.MAIN_RADIUS * math.cos(angle)
-            y = self.conf.MAIN_RADIUS * math.sin(angle)
-            self.propeller_offsets.append(np.array([x, y, 0.0]))
+        self.propeller_offsets = get_propellers_offsets(self.conf.PROPELLERS)
             
         if self.conf.GUI:
             # Initialize thrust storage for visualization

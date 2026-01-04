@@ -1,5 +1,5 @@
 import pybullet_data
-import conf
+import simulator.conf as conf
 
 def generate_world(engine):
     engine.setGravity(0, 0, conf.G)

@@ -4,7 +4,7 @@ from ml.parts import EventToDataSynchronizer
 
 from ml import conf as ml_conf
 
-from physics_engines import get_physics_engine, ERR_ENGINE_NOT_CONNECTED
+from simulator.physics.engines import get_physics_engine, ERR_ENGINE_NOT_CONNECTED
 from propeller.description import Propeller
 from motor.description import Motor
 from sensors.description import Sensors
