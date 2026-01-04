@@ -292,7 +292,8 @@ def analyze_trace(trace_file: str, output_format: str = 'text', output_file: Opt
         print(f"Error: Trace log file not found at '{trace_file}'")
         return
 
-    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file, title = 'multi-process simulation' if configuration.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS else 'multi-thread simulation')
+    analysis_title = 'multi-process simulation' if configuration.PARALLEL_EXECUTION_MODE == ExecutionMode.PROCESS else 'multi-thread simulation' if configuration.PARALLEL_EXECUTION_MODE == ExecutionMode.THREAD else 'simulation'
+    analyze_trace_log(trace_file, output_format=output_format, output_file=output_file, title=analysis_title)
 
 def merge_traces(trace_file_1: str, trace_file_2: str, output_file: str):
     """

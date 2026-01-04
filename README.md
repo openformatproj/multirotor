@@ -87,7 +87,7 @@ REAL_TIME_SIMULATION = False
 HIGH_PRIORITY = False
 # Sets the simulation time step in seconds (240 Hz)
 TIME_STEP = 1./120.
-# Sets how to parallelize parts meant to be executed concurrently (`Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`.
+# Sets how to parallelize parts meant to be executed concurrently (`Simulator(Part)` and `Multirotor(Part)`). Options: `ExecutionMode.THREAD`, `ExecutionMode.PROCESS`, `None`.
 PARALLEL_EXECUTION_MODE = ExecutionMode.THREAD
 # Sets the duration of the simulation in seconds.
 DURATION_SECONDS = 10
@@ -240,12 +240,15 @@ class Top(Part):
             SIMULATOR_ID: Simulator(SIMULATOR_ID, conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
-        execution_strategy = Execution(name='parallel_multirotor_execution',
-            parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
-            mode=conf.PARALLEL_EXECUTION_MODE,
-            log_queue=log_queue,
-            error_queue=error_queue
-        )
+        if conf.PARALLEL_EXECUTION_MODE == None:
+            execution_strategy = Execution.sequential()
+        else:
+            execution_strategy = Execution(name='parallel_multirotor_execution',
+                parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
+                mode=conf.PARALLEL_EXECUTION_MODE,
+                log_queue=log_queue,
+                error_queue=error_queue
+            )
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,

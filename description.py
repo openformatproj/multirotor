@@ -258,12 +258,15 @@ class Top(Part):
             SIMULATOR_ID: Simulator(SIMULATOR_ID, conf),
             MULTIROTOR_ID: Multirotor(MULTIROTOR_ID, conf)
         }
-        execution_strategy = Execution(name='parallel_multirotor_execution',
-            parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
-            mode=conf.PARALLEL_EXECUTION_MODE,
-            log_queue=log_queue,
-            error_queue=error_queue
-        )
+        if conf.PARALLEL_EXECUTION_MODE == None:
+            execution_strategy = Execution.sequential()
+        else:
+            execution_strategy = Execution(name='parallel_multirotor_execution',
+                parallelization_condition=lambda part: part.get_identifier() == MULTIROTOR_ID,
+                mode=conf.PARALLEL_EXECUTION_MODE,
+                log_queue=log_queue,
+                error_queue=error_queue
+            )
         super().__init__(
             identifier=identifier,
             execution_strategy=execution_strategy,
