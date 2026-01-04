@@ -12,7 +12,7 @@ from ml.event_sources import Timer
 from ml.tracer import Tracer, analyze_trace_log, merge_trace_logs
 from ml.enums import OnFullBehavior, LogLevel, ExecutionMode
 from ml import data
-from diagrams.serializer import DiagramSerializer
+from me.serializer import DiagramSerializer
 from diagrams.engine import MainWindow
 from diagrams.optimization import run_simulated_annealing
 from datetime import datetime
