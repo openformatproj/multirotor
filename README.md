@@ -59,7 +59,7 @@ The content of this repository is available in the `/workspaces/multirotor/src` 
 
 ## Configuration
 
-A `src/sim_conf.py` file must be available. This is an example:
+A `src/conf.py` file must be available. This is an example:
 
 ```python
 from math import cos, sin
@@ -129,7 +129,7 @@ SPEED_GRAPH_BOUNDARIES = [(-w * graph_margin, w * graph_margin), (-w * graph_mar
 
 In this case, the multirotor is configured to follow a circular trajectory around the origin in the XY plane while oscillating along the Z axis.
 
-`src/sim_conf.py` is not tracked by Git, allowing you to customize simulation parameters without modifying the core configuration. However, you must add it manually.
+`src/conf.py` is not tracked by Git, allowing you to customize simulation parameters without modifying the core configuration. However, you must add it manually.
 
 # Overview
 
@@ -273,13 +273,13 @@ As it's possible to understand, `class Multirotor` defines its ports, the parts 
 ```python
 def simulate():
 
-    proj_conf = Configuration(conf, sim_conf)
-    data.configure(proj_conf)
-    top = Top('top', conf=proj_conf, log_queue=None, error_queue=None)
+    configuration = Configuration(conf)
+    data.configure(configuration)
+    top = Top('top', conf=configuration, log_queue=None, error_queue=None)
     top.init()
 
-    on_full_behavior = OnFullBehavior.FAIL if conf.REAL_TIME_SIMULATION else OnFullBehavior.DROP
-    timer = Timer(identifier='physics_timer', interval_seconds=conf.TIME_STEP, on_full=on_full_behavior, duration_seconds=conf.DURATION_SECONDS)
+    on_full_behavior = OnFullBehavior.FAIL if configuration.REAL_TIME_SIMULATION else OnFullBehavior.DROP
+    timer = Timer(identifier='physics_timer', interval_seconds=configuration.TIME_STEP, on_full=on_full_behavior, duration_seconds=configuration.DURATION_SECONDS)
 
     event_queues = top.get_event_queues()
     top.connect_event_source(timer, event_queues[0].get_identifier())
